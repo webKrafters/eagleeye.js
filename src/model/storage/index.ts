@@ -1,6 +1,6 @@
 import clonedeep from '@webkrafters/clone-total';
 
-import type { IStorage, State } from '../..';
+import type { IStorage, State } from '../../index_OLD';
 
 class MemoryStorage<T extends State> implements IStorage<T> {
 	#data : T;

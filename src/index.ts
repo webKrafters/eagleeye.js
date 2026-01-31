@@ -1,17 +1,6 @@
 import type {
-    ComponentType,
-    ForwardRefExoticComponent, 
-    MemoExoticComponent,
-    NamedExoticComponent,
-    ReactNode,
-    PropsWithoutRef,
-    RefAttributes
-} from 'react';
-
-import type {
     Changes as BaseChanges,
-    Connection,
-    Immutable,
+    Immutable as AutoImmutable,
     Value
 } from '@webkrafters/auto-immutable';
 
@@ -35,57 +24,25 @@ export type {
 
 export type State = Value;
 
-export type Listener<T extends State = {}> = (
+export type Listener = <T extends State>(
     changes : Changes<T>,
     changedPathsTokens : Readonly<Array<Array<string>>>,
     netChanges : Readonly<T>,
     mayHaveChangesAt : (pathTokens : Array<string>) => boolean
 ) => void;
 
-export type ObservableProvider<T extends State> = ForwardRefExoticComponent<
-    ProviderProps<T> &
-    RefAttributes<StoreRef<T>>
->;
-
-export interface ProviderProps<T extends State> {
-    children?: ReactNode;
+export interface ContextInfra<T extends State> {
     prehooks?: Prehooks<T>;
     storage?: IStorage<T>;
-    value: PartialState<T>;
+}
+
+export interface RawProviderProps<T extends State> extends ContextInfra<T> {
+    value?: T;
 };
 
-export type ConnectProps<
-    OWNPROPS extends OwnProps = IProps,
-    STATE extends State = State,
-    SELECTOR_MAP extends SelectorMap = SelectorMap
-> = { [K in keyof Store<STATE, SELECTOR_MAP>]: Store<STATE, SELECTOR_MAP>[K] }
-    & Omit<OWNPROPS, "ref">
-    & RefAttributes<OWNPROPS["ref"]>;
-
-export type ConnectedComponent<P extends OwnProps = IProps> = MemoExoticComponent<
-    ForwardRefExoticComponent<
-            PropsWithoutRef<Omit<P, "ref">>
-            & RefAttributes<P["ref"]>
-    >
->;
-
-export type PropsExtract<C, STATE extends State, SELECTOR_MAP extends SelectorMap> =
-	C extends ComponentType<ConnectProps<infer U, STATE, SELECTOR_MAP>>
-		? U extends OwnProps ? U : IProps
-		: C extends NamedExoticComponent<ConnectProps<infer U, STATE, SELECTOR_MAP>>
-			? U extends OwnProps ? U : IProps
-			: IProps;
-
-export type ExtractInjectedProps<
-    STATE extends State = State,
-    SELECTOR_MAP extends SelectorMap = SelectorMap,
-    ALL_PROPS extends OwnProps = OwnProps
-> = Omit<ALL_PROPS, keyof Store<STATE>|keyof SELECTOR_MAP>
-
-
-export interface IProps { ref?: unknown }
-
-export type OwnProps = IProps & Record<any, any>;
+export interface ProviderProps<T extends State> extends ContextInfra<T> {
+    value?: AutoImmutable<T>;
+};
 
 export type Text = string | number;
 
@@ -153,13 +110,9 @@ export interface IStorage<T extends State = State> {
     setItem: (key: string, data: T) => void;
 };
 
-export type NonReactUsageReport = (...args: Array<unknown>) => void;
-
-export type PartialState<T extends State> = T extends Partial<infer U> ? T : Partial<T>;
-
 export interface Prehooks<T extends State = State> {
     resetState?: (
-        resetData: PartialState<T>,
+        resetData: Partial<T>,
         state: {
             current: T;
             original: T;
@@ -168,47 +121,23 @@ export interface Prehooks<T extends State = State> {
     setState?: (newChanges: Changes<T>) => boolean;
 };
 
-export type Subscribe = <T extends State>( listener : Listener<T> ) => Unsubscribe;
-
 export type Unsubscribe = (...args: Array<unknown>) => void;
 
-export interface IStore {
-    resetState: Function;
-    setState: Function;
-}
-
-export interface IStoreInternal extends IStore {
-    subscribe: Function;
+export interface IStore<T extends State = State> {
+    resetState : (propertyPaths?: Array<string>) => void;
+    setState : (changes: Changes<T>) => void;
 }
 
 export interface Store<
-    T extends State,
+    T extends State = State,
     SELECTOR_MAP extends SelectorMap = SelectorMap
-> extends IStore {
-    data: Data<SELECTOR_MAP>;
-    resetState: (propertyPaths?: Array<string>) => void;
-    setState: (changes: Changes<T>) => void;
+> extends IStore<T> {
+    data : Data<SELECTOR_MAP>;
 };
 
-export interface StoreInternal<T extends State> extends IStoreInternal {
-    cache: Immutable<Partial<T>>,
-    resetState: (connection: Connection<T>, propertyPaths?: Array<string>) => void;
-    setState: (connection: Connection<T>, changes: Changes<T>) => void;
-    subscribe: Subscribe;
-};
-
-export interface StorePlaceholder extends IStoreInternal {
-    getState: NonReactUsageReport;
-    resetState: NonReactUsageReport;
-    setState: NonReactUsageReport;
-    subscribe: NonReactUsageReport;
-};
-
-export interface StoreRef<T extends State = State> extends StorePlaceholder {
-    getState: (propertyPaths?: Array<string>) => T,
-    resetState: (propertyPaths?: Array<string>) => void;
-    setState: (changes: Changes<T>) => void;
-    subscribe: Subscribe;
+export interface StoreRef<T extends State = State> extends IStore<T>{
+    getState : (propertyPaths?: Array<string>) => T,
+    subscribe : (listener : Listener) => Unsubscribe;
 }
 
 export {
@@ -224,10 +153,4 @@ export {
     Tag,
 } from './constants';
 
-export {
-    connect,
-    createContext,
-    ObservableContext,
-    UsageError,
-    useContext
-} from './main';
+export { createContext } from './main';
