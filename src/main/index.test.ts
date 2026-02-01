@@ -1,9 +1,6 @@
 import { AccessorResponse } from '@webkrafters/auto-immutable';
 
 import type {
-	ConnectedComponent,
-	ConnectProps,
-	ExtractInjectedProps,
 	SelectorMap,
 	Store,
 	StoreRef
@@ -11,42 +8,14 @@ import type {
 
 import getProperty from '@webkrafters/get-property';
 
-import React, {
-	useRef,
-	useEffect,
-	useCallback
-} from 'react';
-
-import {
-	cleanup as cleanupPerfTest,
-	type DefaultPerfToolsField,
-	perf,
-	RenderCountField,
-	type PerfTools,
-	wait
-} from 'react-performance-testing';
-
-import {
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-	SelectorMatcherOptions
-} from '@testing-library/react';
-
-import '@testing-library/jest-dom';
-
 import * as AutoImmutableModule from '@webkrafters/auto-immutable';
 
 import clonedeep from '@webkrafters/clone-total';
 
 import {
-	connect,
-	createContext,
+	createEagleEye,
+	EagleEyeContext as EagleEyeContextClass,
 	mkReadonly,
-	ObservableContext as ObservableContextType,
-	UsageError,
-	useContext
 } from '.';
 
 import { isReadonly } from '../test-artifacts/utils';
@@ -55,23 +24,12 @@ import createSourceData, {
 	type SourceData
 } from '../test-artifacts/data/create-state-obj';
 
-import AppNormal, {
-	ObservableContext,
-	Product,
-	TallyDisplay,
-	TestState
-} from './test-apps/normal';
-import AppWithConnectedChildren from './test-apps/with-connected-children';
-import AppWithPureChildren from './test-apps/with-pure-children';
-
 import {
 	DELETE_TAG,
 	FULL_STATE_SELECTOR,
 	MOVE_TAG,
 	REPLACE_TAG
 } from '../constants';
-
-type PerfValue = PerfTools<DefaultPerfToolsField>;
 
 const { default: AutoImmutable } = AutoImmutableModule;
 
@@ -450,15 +408,15 @@ describe( 'ReactObservableContext', () => {
 	describe( 'accessing store externally through its provider', () => {
 		const sourceData = createSourceData();
 		let storeRef : React.RefObject<StoreRef<Partial<SourceData>>>;
-		let ObservableContext : ObservableContextType<Partial<SourceData>>;
+		let EagleEyeContext : EagleEyeContextClass<Partial<SourceData>>;
 		let TestComp : React.FC<{children?:React.ReactNode}>;
 		beforeAll(() => {
-			ObservableContext = createContext();
+			EagleEyeContext = createEagleEye();
 			TestComp = ({ children }) => {
 				const ref = useRef<StoreRef<Partial<SourceData>>>( null );
 				useEffect(() => { storeRef = ref }, []);
 				return (
-					<ObservableContext.Provider
+					<EagleEyeContext.Provider
 						children={ children }
 						ref={ ref }
 						value={ sourceData }
@@ -481,7 +439,7 @@ describe( 'ReactObservableContext', () => {
 		test( 'can read the current store data', async () => {
 			storeRef = undefined as unknown as typeof storeRef;
 			const NEW_AGE = 71;
-			const Child =  connect( ObservableContext )(({ setState }) => {
+			const Child =  connect( EagleEyeContext )(({ setState }) => {
 				const setAge = React.useCallback(
 					() => setState({ age: NEW_AGE }),
 					[ setState ]
@@ -496,7 +454,7 @@ describe( 'ReactObservableContext', () => {
 		});
 		test( 'can update store and propagate observing components', async () => {
 			storeRef = undefined as unknown as typeof storeRef;
-			const Child =  connect( ObservableContext, {
+			const Child =  connect( EagleEyeContext, {
 				fName: 'name.first'
 			})(({ data: { fName } }) => (
 				<>They call me: <span data-testid="fname">{ fName }</span></>
@@ -519,7 +477,7 @@ describe( 'ReactObservableContext', () => {
 		test( 'can reset store and propagate observing components', async () => {
 			storeRef = undefined as unknown as typeof storeRef;
 			const NEW_EMAIL = 'some.gobbledygook.co.uk';
-			const Child =  connect( ObservableContext, {
+			const Child =  connect( EagleEyeContext, {
 				myEmail: 'email'
 			} )(({ data: { myEmail }, setState }) => {
 				const setEmail = React.useCallback(
@@ -550,7 +508,7 @@ describe( 'ReactObservableContext', () => {
 		});
 		test( 'can observe state changes coming into the store', async () => {
 			storeRef = undefined as unknown as typeof storeRef;
-			const Child =  connect( ObservableContext )(({ setState }) => {
+			const Child =  connect( EagleEyeContext )(({ setState }) => {
 				const setCompany : React.MouseEventHandler<HTMLButtonElement> = React.useCallback(
 					e => setState({ company: ( e.target as HTMLButtonElement ).value }),
 					[ setState ]
@@ -776,7 +734,7 @@ describe( 'ReactObservableContext', () => {
 	describe( 'API', () => {
 		describe( 'connect(...)', () => {
 			let state : {items: Array<{name: string}>};
-			let ObservableContext : ObservableContextType<typeof state>;
+			let EagleEyeContext : EagleEyeContextClass<typeof state>;
 			let selectorMap : { all : string; box : string; };
 			let connector : Function;
 			let ConnectedComponent1 : ConnectedComponent<ExtractInjectedProps<typeof state, typeof selectorMap>>;
@@ -796,12 +754,12 @@ describe( 'ReactObservableContext', () => {
 						{ name: 'box_3' }
 					]
 				};
-				ObservableContext = createContext<typeof state>();
+				EagleEyeContext = createEagleEye<typeof state>();
 				selectorMap = {
 					all: FULL_STATE_SELECTOR,
 					box: 'items.1.name'
 				};
-				connector = connect( ObservableContext, selectorMap );
+				connector = connect( EagleEyeContext, selectorMap );
 				let rawComp : React.FC<typeof compOneProps> = props => { compOneProps = props; return null };
 				ConnectedComponent1 = connector( rawComp );
 				rawComp = props => { compTwoProps = props; return null };
@@ -834,9 +792,9 @@ describe( 'ReactObservableContext', () => {
 						</article>
 					);
 					render(
-						<ObservableContext.Provider value={ state }>
+						<EagleEyeContext.Provider value={ state }>
 							<Ui />
-						</ObservableContext.Provider>
+						</EagleEyeContext.Provider>
 					);
 				});
 				test( 'is always a memoized component', () => {
@@ -877,11 +835,11 @@ describe( 'ReactObservableContext', () => {
 						capturedProps = props;
 						return ( <div /> );
 					};
-					const ConnectedComponent = connect( ObservableContext, selectorMap )( WrappedComponent );
+					const ConnectedComponent = connect( EagleEyeContext, selectorMap )( WrappedComponent );
 					const App = () => (
-						<ObservableContext.Provider value={ state }>
+						<EagleEyeContext.Provider value={ state }>
 							<ConnectedComponent { ...ownProps } ref={ React.useRef() } />
-						</ObservableContext.Provider>
+						</EagleEyeContext.Provider>
 					);
 					render( <App /> );
 					const data : Record<string, unknown>  = {};
@@ -910,12 +868,12 @@ describe( 'ReactObservableContext', () => {
 							capturedProps = props;
 							return null
 						};
-						const fn = connect( ObservableContext, selectorMap );
-						const ConnectedComponent = connect( ObservableContext, selectorMap )( T );
+						const fn = connect( EagleEyeContext, selectorMap );
+						const ConnectedComponent = connect( EagleEyeContext, selectorMap )( T );
 						render(
-							<ObservableContext.Provider value={ state }>
+							<EagleEyeContext.Provider value={ state }>
 								<ConnectedComponent { ...ownProps } />
-							</ObservableContext.Provider>
+							</EagleEyeContext.Provider>
 						);
 						const data : Record<string,unknown> = {};
 						for( const k in selectorMap ) { data[ k ] = expect.anything() }
@@ -928,18 +886,18 @@ describe( 'ReactObservableContext', () => {
 				} );
 			} );
 		} );
-		describe( 'createContext(...)', () => {
+		describe( 'createEagleEye(...)', () => {
 			test( 'returns observable context', () => {
-				expect( ObservableContext ).toBeInstanceOf( ObservableContextType );
-				expect( ObservableContext ).toEqual(
+				expect( EagleEyeContext ).toBeInstanceOf( EagleEyeContextClass );
+				expect( EagleEyeContext ).toEqual(
 					expect.objectContaining({
 						Consumer: expect.any( Object ),
 						Provider: expect.any( Object )
 					})
 				);
-				expect( ObservableContext.Consumer.$$typeof.toString() )
+				expect( EagleEyeContext.Consumer.$$typeof.toString() )
 					.toEqual( 'Symbol(react.context)' );
-				expect( ObservableContext.Provider.$$typeof.toString() )
+				expect( EagleEyeContext.Provider.$$typeof.toString() )
 					.toEqual( 'Symbol(react.forward_ref)' );
 			} );
 			describe( 'Context provider component property', () => {
@@ -947,7 +905,7 @@ describe( 'ReactObservableContext', () => {
 					let renderResult;
 					expect(() => {
 						expect( 
-							render( <ObservableContext.Provider value={{}} /> ).container
+							render( <EagleEyeContext.Provider value={{}} /> ).container
 						).toBeEmptyDOMElement();
 					}).not.toThrow();
 				} );
@@ -968,9 +926,9 @@ describe( 'ReactObservableContext', () => {
 						TestProvider = () => { // eslint-disable-line react/display-name
 							storeRef = React.useRef<StoreRef<Partial<TestState>>>( null );
 							return (
-								<ObservableContext.Provider ref={ storeRef } value={ state }>
+								<EagleEyeContext.Provider ref={ storeRef } value={ state }>
 									<TallyDisplay />
-								</ObservableContext.Provider>
+								</EagleEyeContext.Provider>
 							);
 						};
 					});
@@ -1182,24 +1140,24 @@ describe( 'ReactObservableContext', () => {
 			}>;
 			let Wrapper : React.FC<{children : React.ReactNode}>;
 			let createObservable : ( value : SourceData ) => ({
-				ObservableContext : ObservableContextType<typeof value>;
+				EagleEyeContext : EagleEyeContextClass<typeof value>;
 				Wrapper : typeof Wrapper;
 			});
 			let sourceData : SourceData;
-			let ObservableContext : ObservableContextType<SourceData>;
+			let EagleEyeContext : EagleEyeContextClass<SourceData>;
 			let selectorMapOnRender : Record<string, string>;
 
 			beforeAll(() => {
 				createObservable = value => {
-					const ObservableContext = createContext<typeof value>();
+					const EagleEyeContext = createEagleEye<typeof value>();
 					const _Wrapper : typeof Wrapper = props => (
-						<ObservableContext.Provider value={ value }>
+						<EagleEyeContext.Provider value={ value }>
 							{ props.children }
-						</ObservableContext.Provider>
+						</EagleEyeContext.Provider>
 					);
 					_Wrapper.displayName = 'Wrapper';
 					/* eslint-disable react/display-name */
-					return { ObservableContext, Wrapper: _Wrapper };
+					return { EagleEyeContext, Wrapper: _Wrapper };
 				}
 				sourceData = createSourceData();
 				selectorMapOnRender = {
@@ -1208,11 +1166,11 @@ describe( 'ReactObservableContext', () => {
 					tag6: 'tags[5]'
 				};
 				const observable = createObservable( sourceData );
-				ObservableContext = observable.ObservableContext;
+				EagleEyeContext = observable.EagleEyeContext;
 				Wrapper = observable.Wrapper;
 				/* eslint-disable react/display-name */
 				Client = ({ selectorMap, onChange = ( ...args ) => {} }) => {
-					const store = useContext( ObservableContext, selectorMap );
+					const store = useContext( EagleEyeContext, selectorMap );
 					React.useMemo(() => onChange( store ), [ store ]);
 					return (
 						<div data-testid="data-output">
@@ -1709,7 +1667,7 @@ describe( 'ReactObservableContext', () => {
 					Client : React.FC<{selectorMap : SelectorMap}>,
 					meta : { store : Store<T> }
 				};
-				let setup : <T extends {}>( ctx : ObservableContextType<T> ) => Artefact<T>;
+				let setup : <T extends {}>( ctx : EagleEyeContextClass<T> ) => Artefact<T>;
 				beforeAll(() => {
 					setup = ctx => {
 						let meta = { store : {}  };
@@ -1720,7 +1678,7 @@ describe( 'ReactObservableContext', () => {
 							return null;
 						};
 						Client.displayName = 'Client';
-						return { Client, meta } as Artefact<typeof ctx extends ObservableContextType<infer U> ? U : unknown>;
+						return { Client, meta } as Artefact<typeof ctx extends EagleEyeContextClass<infer U> ? U : unknown>;
 					};
 				});
 				test( 'carries the latest state data as referenced by the selectorMap', async () => {
@@ -1778,8 +1736,8 @@ describe( 'ReactObservableContext', () => {
 					});
 				}, 3e4 );
 				test( 'holds the complete current state object whenever `@@STATE` entry appears in the selectorMap', async () => {
-					const { ObservableContext, Wrapper } = createObservable( createSourceData() );
-					const { Client, meta } = setup( ObservableContext );
+					const { EagleEyeContext, Wrapper } = createObservable( createSourceData() );
+					const { Client, meta } = setup( EagleEyeContext );
 					render(
 						<Wrapper>
 							<Client selectorMap={{
@@ -1855,7 +1813,7 @@ describe( 'ReactObservableContext', () => {
 				beforeAll(() => {
 					Client = props => {
 						const { resetState } = useContext(
-							ObservableContext,
+							EagleEyeContext,
 							props.selectorMap
 						)
 						const doReset = useCallback(() => {

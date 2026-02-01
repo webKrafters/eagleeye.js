@@ -2,8 +2,7 @@ module.exports = function ( api ) {
 	const config = {
 		plugins: [ '@babel/plugin-proposal-nullish-coalescing-operator' ],
 		presets: [
-			'@babel/preset-env',
-			'@babel/preset-react'
+			'@babel/preset-env'
 		]
 	};
 	if( api.env( 'test' ) ) {

@@ -1,27 +1,3 @@
-export interface ConnectProps<
-	T extends State = State,
-	S extends SelectorMap = SelectorMap
-> {
-	store : Store<T, S>
-}
-
-export type OwnPropsOf<P extends {}> = Omit<P, 'store'>;
-
-export interface CurrentStorage<T extends State> extends IStorage<T> {
-	isKeyRequired? : boolean
-}
-
-export interface Stream<T extends State = State> {
-	<S extends SelectorMap>(selectorMap?: S) : Store<T, S>;
-}
-export interface StreamAdapter<T extends State = State> {
-	<S extends SelectorMap>(selectorMap? : S) : <
-		A extends ConnectProps<T, S>
-	>(wrappedFn : (args : A) => unknown) => (
-		(args : OwnPropsOf<A>) => unknown
-	);
-}
-
 import type {
 	PropertyInfo,
 	Transform
@@ -34,16 +10,18 @@ import type {
 
 import type {
 	Changes,
+	CurrentStorage,
 	Data,
 	IStorage,
-	ProviderProps,
 	Listener,
+	ProviderProps,
 	Prehooks,
+	RawProviderProps,
 	SelectorMap,
 	State,
 	Store,
 	StoreRef,
-	RawProviderProps,
+	Stream,
 	Unsubscribe,
 } from '..';
 
@@ -73,7 +51,7 @@ export class LiveStore<
 	S extends SelectorMap = SelectorMap
 > implements Store<T,S> {
 
-	private _context : ObservableContext<T> = null;
+	private _context : EagleEyeContext<T> = null;
 	private _connection : Connection<T> = null;
 	private _data = {} as Data<S, T>;
 	private _fullStateSelectorIndex = -1;
@@ -83,7 +61,7 @@ export class LiveStore<
 	private _renderKeys : Array<string> = [];
 	private _unsubscribe : Unsubscribe = null;
 
-	constructor( context : ObservableContext<T>, selectorMap? : S ) {
+	constructor( context : EagleEyeContext<T>, selectorMap? : S ) {
 		this._context = context;
 		this._connection = this._context.cache.connect();
 		if( isEmpty( selectorMap ) ) { return }
@@ -195,14 +173,13 @@ export class LiveStore<
 	}
 }
 
-export class ObservableContext<T extends State = State>{
+export class EagleEyeContext<T extends State = State>{
 
 	private _cache : AutoImmutable<T>;
 	private _prehooks : Prehooks<T>;
 	private _storage : IStorage<T>;
 	private _store : StoreRef<T>;
 	private _stream : Stream<T>;
-	private _streamAdapter : StreamAdapter<T>;
 	private connection : Connection<T>;
 	private inchoateValue : T;
 	private listeners : Set<Listener>;
@@ -236,13 +213,6 @@ export class ObservableContext<T extends State = State>{
 		this.listeners = new Set<Listener>();
 		this._prehooks = prehooks;
 		this._stream = selectorMap => new LiveStore( this, selectorMap );
-		this._streamAdapter = selectorMap => {
-			const connect = wrappedFn => {
-				const store = this._stream( selectorMap );
-				return args => wrappedFn({ store, ...args });
-			}
-			return connect;
-		};
 		this._storage = storage;
 		const ctx = this;
 		this._store = {
@@ -305,13 +275,6 @@ export class ObservableContext<T extends State = State>{
      * {myData: '@@STATE'} => {myData: state}
      */
 	public get stream() { return this._stream }
-
-	/**
-	 * a reusable HOC function for connecting its WrappedComponent argument to the context stream.
-     * @see {ObservableContext<STATE>::stream} regarding more details on selector map.
-	 * @template {State} STATE
-     */
-	public get streamAdapter() { return this._streamAdapter }
 
 	public destroy() {
 		this._storage.removeItem( this.storageKey );
@@ -399,36 +362,11 @@ export class ObservableContext<T extends State = State>{
 
 }
 
-export function createObservableContext<T extends State = State>( props : ProviderProps<T> = {} ) {
-	return new ObservableContext<T>( props.value, props.prehooks, props.storage );
+export function createEagleEye<T extends State = State>( props? : RawProviderProps<T> ) : EagleEyeContext<T>;
+export function createEagleEye<T extends State = State>( props? : ProviderProps<T> ) : EagleEyeContext<T>; 
+export function createEagleEye<T extends State = State>( props ) {
+	return new EagleEyeContext<T>( props.value, props.prehooks, props.storage );
 }
-
-
-/* ------------------------------------------------------- */
-
-// @debug [BEGINS]
-
-type TestStateQ = { a : number };
-type TestSelectorMapQ = { anchor : 'a' };
-const obCtxImpl = new ObservableContext<TestStateQ>({ a: 22 });
-const adapterImpl = obCtxImpl.streamAdapter({ anchor: 'a' });
-interface PropsImpl extends ConnectProps<
-	TestStateQ,
-	TestSelectorMapQ
-> {
-	make : string;
-	model : string;
-	store : Store<TestStateQ, TestSelectorMapQ>;
-	year : number;
-};
-const MyFnImpl= ( props : PropsImpl ) => props.year;
-const connectedFnImpl = adapterImpl( MyFnImpl );
-() => connectedFnImpl({ make: 'toyota', model: 'camry', year: 1996 });
-
-// @debug [ENDS]
-
-/* ------------------------------------------------------ */
-
 
 /**
  * @param {Array<Array<string>>} changedPathsTokens - list containing tokenized changed object paths.
@@ -472,7 +410,7 @@ function getState<T extends State>(
 	return mkReadonly( state );
 }
 
-function mkReadonly( v : any ) {
+export function mkReadonly( v : any ) {
 	if( Object.isFrozen( v ) ) { return v }
 	if( isPlainObject( v ) || Array.isArray( v ) ) {
 		for( const k in v ) { v[ k ] = mkReadonly( v[ k ] ) }

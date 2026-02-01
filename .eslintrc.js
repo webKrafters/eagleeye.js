@@ -6,7 +6,6 @@ module.exports = {
 		node: true
 	},
 	extends: [
-		'plugin:react/recommended',
 		'standard'
 	],
 	parserOptions: {
@@ -16,7 +15,7 @@ module.exports = {
 		ecmaVersion: 13,
 		sourceType: 'module'
 	},
-	plugins: [ 'jest', 'react' ],
+	plugins: [ 'jest' ],
 	rules: {
 		'array-bracket-spacing': 0,
 		'computed-property-spacing': [ 'error', 'always' ],
@@ -27,8 +26,7 @@ module.exports = {
 		'no-labels': 0,
 		'no-tabs': 0,
 		'no-useless-escape': 0,
-		'padded-blocks': 0,
-		'react/prop-types': 0,
+		'padded-blocks': 0,s
 		'space-before-function-paren': [ 'error', {
 			anonymous: 'always',
 			asyncArrow: 'always',

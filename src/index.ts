@@ -6,6 +6,8 @@ import type {
 
 import { FULL_STATE_SELECTOR } from './constants';
 
+import { createEagleEye } from './main';
+
 export type {
     BaseType,
     ClearCommand,
@@ -110,6 +112,10 @@ export interface IStorage<T extends State = State> {
     setItem: (key: string, data: T) => void;
 };
 
+export interface CurrentStorage<T extends State> extends IStorage<T> {
+	isKeyRequired? : boolean; // required for shared storage API such as localstorage
+}
+
 export interface Prehooks<T extends State = State> {
     resetState?: (
         resetData: Partial<T>,
@@ -140,6 +146,10 @@ export interface StoreRef<T extends State = State> extends IStore<T>{
     subscribe : (listener : Listener) => Unsubscribe;
 }
 
+export interface Stream<T extends State = State> {
+	<S extends SelectorMap>(selectorMap?: S) : Store<T, S>;
+}
+
 export {
     CLEAR_TAG,
     DELETE_TAG,
@@ -153,4 +163,10 @@ export {
     Tag,
 } from './constants';
 
-export { createContext } from './main';
+export {
+    createEagleEye,
+    EagleEyeContext,
+    LiveStore
+} from './main';
+
+export default createEagleEye;
