@@ -6,7 +6,7 @@ import type {
 
 import { FULL_STATE_SELECTOR } from './constants';
 
-import { createEagleEye } from './main';
+import { createEagleEye, LiveStore } from './main';
 
 export type {
     BaseType,
@@ -105,11 +105,26 @@ export type Data<
 
 export type Changes<T extends State = State> = BaseChanges<T>;
 
+interface StorageGetter<T extends State = State>{
+    (key : null) : T;
+    (key : string) : T;
+}
+
+interface StorageDeleteFn{
+    (key : null) : void;
+    (key : string) : void;
+}
+
+interface StorageSetter<T extends State = State>{
+    (key: null, data: T) : void;
+    (key: string, data: T) : void;
+}
+
 export interface IStorage<T extends State = State> {
     clone: (data: T) => T;
-    getItem: (key: string) => T;
-    removeItem: (key: string) => void;
-    setItem: (key: string, data: T) => void;
+    getItem: StorageGetter<T>;
+    removeItem: StorageDeleteFn;
+    setItem: StorageSetter<T>;
 };
 
 export interface CurrentStorage<T extends State> extends IStorage<T> {
@@ -147,7 +162,7 @@ export interface StoreRef<T extends State = State> extends IStore<T>{
 }
 
 export interface Stream<T extends State = State> {
-	<S extends SelectorMap>(selectorMap?: S) : Store<T, S>;
+	<S extends SelectorMap>(selectorMap?: S) : LiveStore<T, S>;
 }
 
 export {

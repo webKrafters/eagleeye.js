@@ -212,8 +212,8 @@ export class EagleEyeContext<T extends State = State>{
 		this.connection = this._cache.connect();
 		this.listeners = new Set<Listener>();
 		this._prehooks = prehooks;
-		this._stream = selectorMap => new LiveStore( this, selectorMap );
 		this._storage = storage;
+		this._stream = selectorMap => new LiveStore( this, selectorMap );
 		const ctx = this;
 		this._store = {
 			getState( propertyPaths : Array<string> = [] ) { return getState( ctx.connection, propertyPaths ) as T },
@@ -230,7 +230,6 @@ export class EagleEyeContext<T extends State = State>{
 	public set prehooks( prehooks : Prehooks<T> ) {
 		this._prehooks = prehooks ?? defaultPrehooks;
 	}
-
 	public set storage( storage : IStorage<T>  ) {
 		let data : T;
 		storage ??= new Storage<T>();
@@ -247,7 +246,6 @@ export class EagleEyeContext<T extends State = State>{
 			: null;
 		this._storage.setItem( this.storageKey, data );
 	};
-
 	public get store() { return this._store };
 
 	/**
@@ -276,7 +274,7 @@ export class EagleEyeContext<T extends State = State>{
      */
 	public get stream() { return this._stream }
 
-	public destroy() {
+	public dispose() {
 		this._storage.removeItem( this.storageKey );
 		this.connection.disconnect();
 		this._cache.close();
@@ -364,7 +362,7 @@ export class EagleEyeContext<T extends State = State>{
 
 export function createEagleEye<T extends State = State>( props? : RawProviderProps<T> ) : EagleEyeContext<T>;
 export function createEagleEye<T extends State = State>( props? : ProviderProps<T> ) : EagleEyeContext<T>; 
-export function createEagleEye<T extends State = State>( props ) {
+export function createEagleEye<T extends State = State>( props = {} as ProviderProps<T> ) {
 	return new EagleEyeContext<T>( props.value, props.prehooks, props.storage );
 }
 
