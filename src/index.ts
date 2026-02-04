@@ -144,6 +144,11 @@ export interface Prehooks<T extends State = State> {
 
 export type Unsubscribe = (...args: Array<unknown>) => void;
 
+export const enum StoreShutdownReason {
+	LOCAL = 'USER LOCALLY INITIATED SHUTDOWN',
+	REMOTE = 'REMOTE CACHE SHUTDOWN'
+};
+
 export interface IStore<T extends State = State> {
     resetState : (propertyPaths?: Array<string>) => void;
     setState : (changes: Changes<T>) => void;
@@ -161,8 +166,12 @@ export interface StoreRef<T extends State = State> extends IStore<T>{
     subscribe : (listener : Listener) => Unsubscribe;
 }
 
-export interface Stream<T extends State = State> {
+export interface BaseStream<T extends State = State>{
 	<S extends SelectorMap>(selectorMap?: S) : LiveStore<T, S>;
+}
+
+export interface Stream<T extends State = State> extends BaseStream<T>{
+	<S extends SelectorMap>(selectorMap?: S) : Store<T, S>;
 }
 
 export {

@@ -9,6 +9,7 @@ import type {
 } from '@webkrafters/auto-immutable';
 
 import type {
+	BaseStream,
 	Changes,
 	CurrentStorage,
 	Data,
@@ -21,7 +22,6 @@ import type {
 	State,
 	Store,
 	StoreRef,
-	Stream,
 	Unsubscribe,
 } from '..';
 
@@ -39,6 +39,8 @@ import * as constants from '../constants';
 
 import Storage from '../model/storage';
 
+import { StoreShutdownReason } from '..';
+
 let iCount = -1;
 const createStorageKey = () => `${ ++iCount }:${ Date.now() }:${ Math.random() }`;
 // to facilitate testing
@@ -55,17 +57,23 @@ export class LiveStore<
 	private _connection : Connection<T> = null;
 	private _data = {} as Data<S, T>;
 	private _fullStateSelectorIndex = -1;
+	private _isActive = true;
+	private _onBeforeClose: (reason : StoreShutdownReason) => void = null;
+	private _onDataChange : () => void = null;
 	private _selectorMap : S = null;
 	private _selectorMapInverse = {};
-	private _onDataChange : () => void = null;
 	private _renderKeys : Array<string> = [];
 	private _unsubscribe : Unsubscribe = null;
 
 	constructor( context : EagleEyeContext<T>, selectorMap? : S ) {
 		this._context = context;
 		this._connection = this._context.cache.connect();
+		this._context.cache.onClose(() => {
+			this._onBeforeClose?.( StoreShutdownReason.REMOTE );
+			this._reclaim();
+		});
 		if( isEmpty( selectorMap ) ) { return }
-		this._unsubscribe = this._context.store.subscribe( this._dataSourceListener );
+		this.subscribe();
 		this._selectorMap = selectorMap;
 		this._renderKeys = Object.values( selectorMap as {} );
 		this._fullStateSelectorIndex = this._renderKeys.indexOf( constants.FULL_STATE_SELECTOR );
@@ -83,16 +91,27 @@ export class LiveStore<
 		this._refreshDataRef();
 	}
 	
+	@invoke
 	public get data() { return this._data }
+
+	@invoke
+	public get streaming() { return this._isActive }
+
+	@invoke
+	public set onBeforeClose(
+		handler : typeof this._onBeforeClose
+	) { this._onBeforeClose = handler }
 	
+	@invoke
 	public set onDataChange(
 		handler : typeof this._onDataChange
 	) { this._onDataChange = handler }
-
+	
+	@invoke
 	public set selectorMap( selectorMap : S ) {
 		selectorMap = selectorMap ?? null;
-		if( this._context.cache.closed || selectorMap === this.selectorMap || isEqual( selectorMap, this.selectorMap ) ) { return }
-		this._unsubscribe?.();
+		if( selectorMap === this.selectorMap || isEqual( selectorMap, this.selectorMap ) ) { return }
+		this.unsubscribe();
 		this._connection.disconnect();
 		this._connection = this._context.cache.connect();
 		this._selectorMapInverse = {};
@@ -109,25 +128,38 @@ export class LiveStore<
 			for( const selectorKey in this._selectorMap ) {
 				this._selectorMapInverse[ this._selectorMap[ selectorKey as string ] ] = selectorKey;
 			}
-			this._unsubscribe = this._context.store.subscribe( this._dataSourceListener );
+			this.subscribe();
 			this._updateData();
 		}
 	}
 
+	@invoke
 	public close() {
-		this._unsubscribe?.();
+		this._onBeforeClose?.( StoreShutdownReason.LOCAL );
 		this._connection.disconnect();
-		this._unsubscribe = null;
-		this._connection = null;
-		this._context = null;
+		this._reclaim();
 	}
 	
+	@invoke
 	public resetState( propertyPaths = this._renderKeys as Array<string> ) {
 		this._context.store.resetState( propertyPaths );
 	}
 
+	@invoke
 	public setState( changes : Changes<T> ) {
 		this._context.store.setState( changes );
+	}
+
+	@invoke
+	protected subscribe() {
+		this._unsubscribe ||= this._context.store.subscribe( this._dataSourceListener );
+	}
+
+	@invoke
+	protected unsubscribe() {
+		if( !this._unsubscribe ) { return }
+		this._unsubscribe();
+		this._unsubscribe = null;
 	}
 
 	private _dataSourceListener : Listener = (
@@ -140,6 +172,30 @@ export class LiveStore<
 			return this._updateData();
 		}
 	};
+
+	private _reclaim() {
+		this.unsubscribe();
+		this._connection = null;
+		this._context = null;
+		this._isActive = false;
+		this._onBeforeClose = null;
+		this._onDataChange = null;
+		this._renderKeys = [];
+		this._unsubscribe = null;
+	}
+	
+	private _refineKeys = () => {
+		const rKeys = this._renderKeys.slice();
+		if( this._fullStateSelectorIndex !== -1 ) {
+			rKeys[ this._fullStateSelectorIndex ] = constants.GLOBAL_SELECTOR;
+		}
+		return rKeys;
+	}
+
+	private _refreshDataRef() {
+		this._data = { ...this._data };
+		this._onDataChange?.();
+	}
 
 	private _updateData = () => {
 		let hasChanges = false;
@@ -158,19 +214,6 @@ export class LiveStore<
 		}
 		hasChanges && this._refreshDataRef();
 	}
-	
-	private _refineKeys = () => {
-		const rKeys = this._renderKeys.slice();
-		if( this._fullStateSelectorIndex !== -1 ) {
-			rKeys[ this._fullStateSelectorIndex ] = constants.GLOBAL_SELECTOR;
-		}
-		return rKeys;
-	}
-
-	private _refreshDataRef() {
-		this._data = { ...this._data };
-		this._onDataChange?.();
-	}
 }
 
 export class EagleEyeContext<T extends State = State>{
@@ -179,11 +222,13 @@ export class EagleEyeContext<T extends State = State>{
 	private _prehooks : Prehooks<T>;
 	private _storage : IStorage<T>;
 	private _store : StoreRef<T>;
-	private _stream : Stream<T>;
 	private connection : Connection<T>;
 	private inchoateValue : T;
+	private isCacheLocal = true;
 	private listeners : Set<Listener>;
 	private storageKey : string = null;
+
+	protected _stream : BaseStream<T>;
 
 	constructor(
 		value? : AutoImmutable<T>,
@@ -208,12 +253,14 @@ export class EagleEyeContext<T extends State = State>{
 			const tConnection = this._cache.connect();
 			this.inchoateValue = tConnection.get( constants.FULL_STATE_SELECTOR )[ constants.FULL_STATE_SELECTOR ];
 			tConnection.disconnect();
+			this.isCacheLocal = false;
+			this._cache.onClose(() => { this._reclaim() });
 		}
 		this.connection = this._cache.connect();
 		this.listeners = new Set<Listener>();
 		this._prehooks = prehooks;
 		this._storage = storage;
-		this._stream = selectorMap => new LiveStore( this, selectorMap );
+		this.initStream();
 		const ctx = this;
 		this._store = {
 			getState( propertyPaths : Array<string> = [] ) { return getState( ctx.connection, propertyPaths ) as T },
@@ -275,10 +322,9 @@ export class EagleEyeContext<T extends State = State>{
 	public get stream() { return this._stream }
 
 	public dispose() {
-		this._storage.removeItem( this.storageKey );
 		this.connection.disconnect();
-		this._cache.close();
-		this.listeners.clear();
+		this.isCacheLocal && this._cache.close();
+		this._reclaim();
 	}
 	
 	protected emit = ( changes : Changes<T> ) => (
@@ -288,6 +334,10 @@ export class EagleEyeContext<T extends State = State>{
 		const mayHaveChangesAt = createChangePathSearch( changedPathsTokens );
 		this.listeners.forEach( listener => listener( changes, changedPathsTokens, netChanges, mayHaveChangesAt ) );
 	};
+
+	protected initStream() {
+		this._stream = selectorMap => new LiveStore( this, selectorMap );
+	}
 
 	protected resetState(
 		connection : Connection<T>,
@@ -356,6 +406,11 @@ export class EagleEyeContext<T extends State = State>{
 	protected subscribe( listener : Listener ) {
 		this.listeners.add( listener );
 		return () => this.listeners.delete( listener );
+	}
+
+	private _reclaim() {
+		this._storage.removeItem( this.storageKey );
+		this.listeners.clear();
 	}
 
 }
@@ -437,4 +492,17 @@ function transformPayload<T extends State>( payload : UpdatePayload<T> ) {
 	payload = { ...payload, [ constants.GLOBAL_SELECTOR ]: payload[ constants.FULL_STATE_SELECTOR ] };
 	delete payload[ constants.FULL_STATE_SELECTOR ];
 	return payload;
+}
+
+function invoke<C>( method: Function, context: C ) {
+    return function <
+		T extends State = State,
+		S extends SelectorMap = SelectorMap
+	>(
+        this: LiveStore<T, S>,
+        ...args: Array<any>
+    ) {
+        if( !this.streaming ) { return }
+        return method.apply( this, args );
+	};
 }

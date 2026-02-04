@@ -17,6 +17,9 @@
     // next to the .js files
     "esModuleInterop": true,
     "isolatedModules": true,
+    "lib": [
+      "ESNext"
+    ],
     "moduleResolution": "NodeNext",
     "module": "NodeNext",
     "outDir": "dist",
