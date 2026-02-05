@@ -26,6 +26,8 @@ export type {
 
 export type State = Value;
 
+export type ShutdownMonitor = (reason : ShutdownReason) => void
+
 export type Listener = <T extends State>(
     changes : Changes<T>,
     changedPathsTokens : Readonly<Array<Array<string>>>,
@@ -144,9 +146,10 @@ export interface Prehooks<T extends State = State> {
 
 export type Unsubscribe = (...args: Array<unknown>) => void;
 
-export const enum StoreShutdownReason {
-	LOCAL = 'USER LOCALLY INITIATED SHUTDOWN',
-	REMOTE = 'REMOTE CACHE SHUTDOWN'
+export const enum ShutdownReason {
+	CACHE = 'CACHE DATA SHUTDOWN',
+    CONTEXT = 'CONTEXT-WIDE SHUTDOWN',
+	LOCAL = 'CURRENT STORE INITIATED SHUTDOWN'
 };
 
 export interface IStore<T extends State = State> {
@@ -162,8 +165,11 @@ export interface Store<
 };
 
 export interface StoreRef<T extends State = State> extends IStore<T>{
-    getState : (propertyPaths?: Array<string>) => T,
-    subscribe : (listener : Listener) => Unsubscribe;
+    getState : (propertyPaths?: Array<string>) => T;
+    subscribe : {
+        (eventType: "closing", listener: ShutdownMonitor) : Unsubscribe;
+        (eventType: "dataUpdate", listener: Listener) : Unsubscribe;
+    }
 }
 
 export interface BaseStream<T extends State = State>{

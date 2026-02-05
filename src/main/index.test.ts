@@ -1,7 +1,7 @@
 import { AccessorResponse, Immutable } from '@webkrafters/auto-immutable';
 
 import {
-	StoreShutdownReason,
+	ShutdownReason,
 	type BaseStream,
 	type IStorage,
 	type Prehooks,
@@ -246,7 +246,7 @@ describe( 'EagleEyeContext', () => {
 						) ).toBe( true );
 					} );
 				} );
-				describe( 'guarantees data immutability by ensuring by...', () => {
+				describe( 'guarantees data immutability by...', () => {
 					test( 'returning readonly state for all default requests', () => {
 						expect( isReadonly( ctx.store.getState() ) ).toBe( true );
 					} );
@@ -293,7 +293,7 @@ describe( 'EagleEyeContext', () => {
 			test( 'subscribes to state changes', async () => {
 				const changes = { price: 45 };
 				const onChangeMock = jest.fn();
-				const unsub = ctx.store.subscribe( onChangeMock );
+				const unsub = ctx.store.subscribe( 'dataUpdate', onChangeMock );
 				expect( onChangeMock ).not.toHaveBeenCalled();
 				ctx.store.setState( changes );
 				expect( onChangeMock ).toHaveBeenCalled();
@@ -372,78 +372,58 @@ describe( 'EagleEyeContext', () => {
 				});
 				store.close();
 			} );
-			describe( 'properties', () => {
-				describe( 'store.onBeforeClose', () => {
+			describe( 'events', () => {
+				describe( 'closing', () => {
 					let ctx : EagleEyeContextClass<Partial<SourceData>>;
 					beforeEach(() => {
 						ctx = new EagleEyeContextClass<Partial<SourceData>>( createSourceData() );
 					});
 					afterEach(() =>  { ctx.dispose() });
-					test( 'is a setter property accepting callback', () => {
-						const store = ctx.stream();
-						expect( () => store.onBeforeClose ).toThrow();
-						expect(() => { store.onBeforeClose = ()=>{} }).not.toThrow();
-						store.close();
-					} );
 					test( 'invoked at the end of live store streaming phase', () => {
 						const store = ctx.stream();
 						const closeHandler = jest.fn();
-						store.onBeforeClose = closeHandler;
+						store.addListener( 'closing', closeHandler );
 						expect( closeHandler ).not.toHaveBeenCalled();
 						store.close();
 						expect( closeHandler ).toHaveBeenCalled();
 					} );
-					test( 'invoked at the end of live store streaming phase', () => {
+					test( 'invoked with a user level message at normal closure', () => {
 						const store = ctx.stream();
 						const closeHandler = jest.fn();
-						store.onBeforeClose = closeHandler;
-						expect( closeHandler ).not.toHaveBeenCalled();
+						store.addListener( 'closing', closeHandler );
 						store.close();
-						expect( closeHandler ).toHaveBeenCalled();
+						expect( closeHandler ).toHaveBeenCalledWith( ShutdownReason.LOCAL );
 					} );
-					test( 'is invoked with a user level message at normal closure', () => {
-						const store = ctx.stream();
-						const closeHandler = jest.fn();
-						store.onBeforeClose = closeHandler;
-						store.close();
-						expect( closeHandler ).toHaveBeenCalledWith( StoreShutdownReason.LOCAL );
-					} );
-					test( 'is invoked with a remote level message when closing due to downstream cache closure', () => {
+					test( 'is invoked with a cache level message when closing due to downstream cache closure', () => {
 						const cache = new AutoImmutable( createSourceData() );
 						const ctx = new EagleEyeContextClass( cache );
 						const store = ctx.stream();
 						const closeHandler = jest.fn();
-						store.onBeforeClose = closeHandler;
+						store.addListener( 'closing', closeHandler );
 						expect( store.streaming ).toBe( true );
 						ctx.cache.close();
 						expect( store.streaming ).toBe( false );
-						expect( closeHandler ).toHaveBeenCalledWith( StoreShutdownReason.REMOTE );
+						expect( closeHandler ).toHaveBeenCalledWith( ShutdownReason.CACHE );
 						ctx.dispose();
 					} );
-					test( 'is invoked with a remote level message when closing due to context disposal', () => {
+					test( 'is invoked with a context level message when closing due to context disposal', () => {
 						const cache = new AutoImmutable( createSourceData() );
 						const ctx = new EagleEyeContextClass( cache );
 						const store = ctx.stream();
 						const closeHandler = jest.fn();
-						store.onBeforeClose = closeHandler;
+						store.addListener( 'closing', closeHandler );
 						expect( store.streaming ).toBe( true );
 						ctx.dispose();
 						expect( store.streaming ).toBe( false );
-						expect( closeHandler ).toHaveBeenCalledWith( StoreShutdownReason.REMOTE );
+						expect( closeHandler ).toHaveBeenCalledWith( ShutdownReason.CONTEXT );
 					} );
 				} );
-				describe( 'store.onDataChange', () => {
+				describe( 'dataChange', () => {
 					let ctx : EagleEyeContextClass<Partial<SourceData>>;
 					beforeEach(() => {
 						ctx = new EagleEyeContextClass<Partial<SourceData>>( createSourceData() );
 					});
 					afterEach(() =>  { ctx.dispose() });
-					test( 'is a setter property accepting callback', () => {
-						const store = ctx.stream();
-						expect( () => store.onDataChange ).toThrow();
-						expect(() => { store.onDataChange = ()=>{} }).not.toThrow();
-						store.close();
-					})
 					test( 'invoked whenever store.data changes', () => {
 						const selectorMap = {
 							company: 'company',
@@ -455,7 +435,7 @@ describe( 'EagleEyeContext', () => {
 							lineDigits: '2282'
 						});
 						const changeHandler = jest.fn();
-						store.onDataChange = changeHandler;
+						store.addListener( 'dataChange', changeHandler );
 						expect( changeHandler ).not.toHaveBeenCalled();
 						store.setState({ isActive: true }); // change to global ctx did not affect stream
 						expect( store.data ).toEqual({
@@ -479,6 +459,169 @@ describe( 'EagleEyeContext', () => {
 						expect( changeHandler ).toHaveBeenCalledTimes( 1 );
 						changeHandler.mockClear();
 						store.close();
+					} );
+				} );
+			} );
+			describe( 'properties', () => {
+				describe( 'store.data', () => {
+					let ctx : EagleEyeContextClass<Partial<SourceData>>;
+					beforeEach(() => {
+						ctx = new EagleEyeContextClass<Partial<SourceData>>( createSourceData() );
+					});
+					afterEach(() => { ctx.dispose() });
+					test( 'carries the latest state data as referenced by the selectorMap', () => {
+						const store = ctx.stream({
+							city3: 'history.places[2].city',
+							country3: 'history.places[2].country',
+							friends: 'friends',
+							year3: 'history.places[2].year',
+							isActive: 'isActive',
+							tag6: 'tags[5]',
+							tag7: 'tags[6]',
+							tags: 'tags'
+						});
+						const defaultState = createSourceData();
+						const expectedValue = {
+							city3: defaultState.history.places[ 2 ].city,
+							country3: defaultState.history.places[ 2 ].country,
+							friends: defaultState.friends,
+							year3: defaultState.history.places[ 2 ].year,
+							isActive: defaultState.isActive,
+							tag6: defaultState.tags[ 5 ],
+							tag7: defaultState.tags[ 6 ],
+							tags: defaultState.tags
+						};
+						expect( store.data ).toEqual( expectedValue );
+						store.setState({
+							friends: { [ MOVE_TAG ]: [ -1, 1 ] } as unknown as Array<any>,
+							isActive: true,
+							history: {
+								places: {
+									2: {
+										city: 'Marakesh',
+										country: 'Morocco'
+									}  as SourceData["history"]["places"][0]
+								} as unknown as SourceData["history"]["places"]
+							},
+							tags: { [ DELETE_TAG ]: [ 3, 5 ] } as unknown as SourceData["tags"]
+						});
+						expect( store.data ).toEqual({
+							...expectedValue,
+							city3: 'Marakesh',
+							country3: 'Morocco',
+							friends: [ 0, 2, 1 ].map( i => defaultState.friends[ i ] ),
+							isActive: true,
+							tag6: undefined,
+							tag7: undefined,
+							tags: [ 0, 1, 2, 4, 6 ].map( i => defaultState.tags[ i ] )
+						});
+						store.close();
+					} );
+					test( 'holds the complete current state object whenever `@@STATE` entry appears in the selectorMap', () => {
+						const store = ctx.stream({
+							city3: 'history.places[2].city',
+							country3: 'history.places[2].country',
+							year3: 'history.places[2].year',
+							isActive: 'isActive',
+							tag6: 'tags[5]',
+							tag7: 'tags[6]',
+							state: '@@STATE'
+						});
+						const defaultState = createSourceData();
+						const expectedValue = {
+							city3: defaultState.history.places[ 2 ].city,
+							country3: defaultState.history.places[ 2 ].country,
+							year3: defaultState.history.places[ 2 ].year,
+							isActive: defaultState.isActive,
+							tag6: defaultState.tags[ 5 ],
+							tag7: defaultState.tags[ 6 ],
+							state: defaultState
+						};
+						expect( store.data ).toEqual( expectedValue );
+						store.setState({
+							isActive: true,
+							history: {
+								places: {
+									2: {
+										city: 'Marakesh',
+										country: 'Morocco'
+									}
+								}
+							}
+						} as unknown as SourceData );
+						const updatedDataEquiv = createSourceData();
+						updatedDataEquiv.history.places[ 2 ].city = 'Marakesh';
+						updatedDataEquiv.history.places[ 2 ].country = 'Morocco';
+						updatedDataEquiv.isActive = true;
+						expect( store.data ).toEqual({
+							...expectedValue,
+							city3: 'Marakesh',
+							country3: 'Morocco',
+							isActive: true,
+							state: updatedDataEquiv
+						});
+						store.close();
+					} );
+					test( 'holds an empty object when no renderKeys provided ', async () => {
+						const store = ctx.stream();
+						expect( store.data ).toEqual({});
+						store.setState({ // can still update state
+							isActive: true,
+							history: {
+								places: {
+									2: {
+										city: 'Marakesh',
+										country: 'Morocco'
+									}
+								} as unknown as SourceData["history"]["places"]
+							} as SourceData["history"]
+						});
+						expect( store.data ).toEqual({});
+						store.close();
+					} );
+					test( 'does not update for resubmitted changes', async () => {
+						const ctx = new EagleEyeContextClass<Partial<SourceData>>( createSourceData() );
+						const store = ctx.stream({ company: 'company', fn: 'name.first' });
+						expect( store.data ).toEqual({
+							company: 'VORTEXACO',
+							fn: 'Amber'
+						});
+						store.setState({
+							company: 'New Company',
+							name: {
+								first: 'Jack'
+							} as SourceData[ "name" ]
+						} );
+						const currStoreData = store.data;
+						expect( store.data ).toEqual({
+							company: 'New Company',
+							fn: 'Jack'
+						});
+						store.setState({
+							company: 'New Company',
+							gender: 'Male',
+							name: {
+								first: 'Jack',
+								last: 'Franken'
+							}
+						} );
+						expect( store.data ).toBe( currStoreData );
+					} );
+					test( 'does not respond to changes not affecting it', async () => {
+						const ctx = new EagleEyeContextClass<Partial<SourceData>>( createSourceData() );
+						const store = ctx.stream({ company: 'company', fn: 'name.first' });
+						expect( store.data ).toEqual({
+							company: 'VORTEXACO',
+							fn: 'Amber'
+						});
+						const currStoreData = store.data;
+						store.setState({
+							gender: 'Male',
+							name: {
+								last: 'Franken'
+							} as SourceData["name"]
+						} );
+						expect( store.data ).toBe( currStoreData );
 					} );
 				} );
 				describe( 'store.selectorMap', () => {
@@ -508,13 +651,11 @@ describe( 'EagleEyeContext', () => {
 								company: 'company'
 							};
 							const store = ctx.stream( origSelectorMap );
-							let _data : typeof mockGetReturnValue = store.data;
-							store.onDataChange = () => { _data = store.data };
 							store.selectorMap = _selectorMapOnRender as unknown as OrigSelectorMap;
-							expect( Object.keys( _data ) )
+							expect( Object.keys( store.data ) )
 								.toEqual( Object.keys( _selectorMapOnRender ));
 							store.selectorMap = selectorMapOnRerender as unknown as OrigSelectorMap;
-							expect( Object.keys( _data ) )
+							expect( Object.keys( store.data ) )
 								.toEqual( Object.keys( selectorMapOnRerender ));
 						});
 						test( 'destroys previous and obtains new connection', () => {
@@ -940,6 +1081,39 @@ describe( 'EagleEyeContext', () => {
 					} );
 				} );
 			} );
+			describe( 'store.addListener', () => {
+				let ctx : EagleEyeContextClass<Partial<SourceData>>;
+				beforeEach(() => {
+					ctx = new EagleEyeContextClass<Partial<SourceData>>( createSourceData() );
+				});
+				afterEach(() =>  { ctx.dispose() });
+				test( 'allows for listeners to be added for store data change and store closing events', () => {
+					const store = ctx.stream();
+					const mockChangeListener = jest.fn();
+					const mockCloseListener = jest.fn();
+					store.addListener( 'dataChange', mockCloseListener );
+					store.addListener( 'closing', mockChangeListener );
+					store.setState({ age: 55 });
+					expect( mockChangeListener ).toHaveBeenCalled();
+					expect( mockCloseListener ).not.toHaveBeenCalled();
+					mockChangeListener.mockClear();
+					store.setState({ name: { first: 'Janet' } });
+					expect( mockChangeListener ).toHaveBeenCalled();
+					expect( mockCloseListener ).not.toHaveBeenCalled();
+					mockChangeListener.mockClear();
+					store.close();
+					expect( mockChangeListener ).not.toHaveBeenCalled();
+					expect( mockCloseListener ).toHaveBeenCalled();
+				} );
+				test( 'attempt to add listeners for unknown events is not allowed', () => {
+					const store = ctx.stream();
+					expect(() => {
+						// @ts-expect-error
+						store.addListener( 'someEvent', () => {} );
+					} ).toThrow();
+					store.close();
+				} )
+			} );
 			describe( 'store.close', () => {
 				let ctx : EagleEyeContextClass<Partial<SourceData>>;
 				beforeEach(() => {
@@ -960,7 +1134,7 @@ describe( 'EagleEyeContext', () => {
 					};
 					const dataChangeHandler = jest.fn();
 					const store = ctx.stream( selectorMap );
-					store.onDataChange = dataChangeHandler;
+					store.addListener( 'dataChange', dataChangeHandler );
 					expect( store.data ).toEqual({ reghHour: 9 });
 					setSpy.mockClear();
 					getSpy.mockClear();
@@ -1003,123 +1177,40 @@ describe( 'EagleEyeContext', () => {
 					ctx.dispose();
 
 				} );
-			} );
-			describe( 'store.data', () => {
+			} );			
+			describe( 'store.removeListener', () => {
 				let ctx : EagleEyeContextClass<Partial<SourceData>>;
 				beforeEach(() => {
 					ctx = new EagleEyeContextClass<Partial<SourceData>>( createSourceData() );
 				});
-				afterEach(() => { ctx.dispose() });
-				test( 'carries the latest state data as referenced by the selectorMap', () => {
-					const store = ctx.stream({
-						city3: 'history.places[2].city',
-						country3: 'history.places[2].country',
-						friends: 'friends',
-						year3: 'history.places[2].year',
-						isActive: 'isActive',
-						tag6: 'tags[5]',
-						tag7: 'tags[6]',
-						tags: 'tags'
-					});
-					const defaultState = createSourceData();
-					const expectedValue = {
-						city3: defaultState.history.places[ 2 ].city,
-						country3: defaultState.history.places[ 2 ].country,
-						friends: defaultState.friends,
-						year3: defaultState.history.places[ 2 ].year,
-						isActive: defaultState.isActive,
-						tag6: defaultState.tags[ 5 ],
-						tag7: defaultState.tags[ 6 ],
-						tags: defaultState.tags
-					};
-					expect( store.data ).toEqual( expectedValue );
-					store.setState({
-						friends: { [ MOVE_TAG ]: [ -1, 1 ] } as unknown as Array<any>,
-						isActive: true,
-						history: {
-							places: {
-								2: {
-									city: 'Marakesh',
-									country: 'Morocco'
-								}  as SourceData["history"]["places"][0]
-							} as unknown as SourceData["history"]["places"]
-						},
-						tags: { [ DELETE_TAG ]: [ 3, 5 ] } as unknown as SourceData["tags"]
-					});
-					expect( store.data ).toEqual({
-						...expectedValue,
-						city3: 'Marakesh',
-						country3: 'Morocco',
-						friends: [ 0, 2, 1 ].map( i => defaultState.friends[ i ] ),
-						isActive: true,
-						tag6: undefined,
-						tag7: undefined,
-						tags: [ 0, 1, 2, 4, 6 ].map( i => defaultState.tags[ i ] )
-					});
-					store.close();
-				} );
-				test( 'holds the complete current state object whenever `@@STATE` entry appears in the selectorMap', () => {
-					const store = ctx.stream({
-						city3: 'history.places[2].city',
-						country3: 'history.places[2].country',
-						year3: 'history.places[2].year',
-						isActive: 'isActive',
-						tag6: 'tags[5]',
-						tag7: 'tags[6]',
-						state: '@@STATE'
-					});
-					const defaultState = createSourceData();
-					const expectedValue = {
-						city3: defaultState.history.places[ 2 ].city,
-						country3: defaultState.history.places[ 2 ].country,
-						year3: defaultState.history.places[ 2 ].year,
-						isActive: defaultState.isActive,
-						tag6: defaultState.tags[ 5 ],
-						tag7: defaultState.tags[ 6 ],
-						state: defaultState
-					};
-					expect( store.data ).toEqual( expectedValue );
-					store.setState({
-						isActive: true,
-						history: {
-							places: {
-								2: {
-									city: 'Marakesh',
-									country: 'Morocco'
-								}
-							}
-						}
-					} as unknown as SourceData );
-					const updatedDataEquiv = createSourceData();
-					updatedDataEquiv.history.places[ 2 ].city = 'Marakesh';
-					updatedDataEquiv.history.places[ 2 ].country = 'Morocco';
-					updatedDataEquiv.isActive = true;
-					expect( store.data ).toEqual({
-						...expectedValue,
-						city3: 'Marakesh',
-						country3: 'Morocco',
-						isActive: true,
-						state: updatedDataEquiv
-					});
-					store.close();
-				} );
-				test( 'holds an empty object when no renderKeys provided ', async () => {
+				afterEach(() =>  { ctx.dispose() });
+				test( 'allows for added listeners to be removed for store data change and store closing events', () => {
 					const store = ctx.stream();
-					expect( store.data ).toEqual({});
-					store.setState({ // can still update state
-						isActive: true,
-						history: {
-							places: {
-								2: {
-									city: 'Marakesh',
-									country: 'Morocco'
-								}
-							} as unknown as SourceData["history"]["places"]
-						} as SourceData["history"]
-					});
-					expect( store.data ).toEqual({});
+					const mockChangeListener = jest.fn();
+					const mockCloseListener = jest.fn();
+					store.addListener( 'dataChange', mockCloseListener );
+					store.addListener( 'closing', mockChangeListener );
+					store.setState({ age: 55 });
+					expect( mockChangeListener ).toHaveBeenCalled();
+					expect( mockCloseListener ).not.toHaveBeenCalled();
+					mockChangeListener.mockClear();
+					store.removeListener( 'dataChange', mockCloseListener );
+					store.removeListener( 'closing', mockChangeListener );
+					store.setState({ name: { first: 'Janet' } });
+					expect( mockChangeListener ).not.toHaveBeenCalled();
+					expect( mockCloseListener ).not.toHaveBeenCalled();
 					store.close();
+					expect( mockChangeListener ).not.toHaveBeenCalled();
+					expect( mockCloseListener ).not.toHaveBeenCalled();
 				} );
+				test( 'attempt to remove listeners for unknown events is not allowed', () => {
+					const store = ctx.stream();
+					expect(() => {
+						// @ts-expect-error
+						store.removeListener( 'someEvent', () => {} );
+					} ).toThrow();
+					store.close();
+				} )
 			} );
 			describe( 'store.resetState', () => {
 				let ctx : EagleEyeContextClass<Partial<SourceData>>;
@@ -1249,456 +1340,6 @@ describe( 'EagleEyeContext', () => {
 					} );
 				} );
 			} );
-			describe( 'store.selectorMap', () => {
-				let selectorMapOnRerender : typeof selectorMapOnRender & { country3 : "history.places[2].country" };
-				let mockGetReturnValue : AccessorResponse<SourceData>;
-				beforeAll(() => {
-					selectorMapOnRerender = clonedeep( selectorMapOnRender );
-					selectorMapOnRerender.country3 = 'history.places[2].country';
-					mockGetReturnValue = Array.from( new Set(
-						Object.values( selectorMapOnRender ).concat(
-							Object.values( selectorMapOnRerender )
-						)
-					) ).reduce(( o : Record<string, unknown>, k ) => {
-						o[ k ] = null;
-						return o;
-					}, {}) as typeof mockGetReturnValue;
-				});
-				describe( 'normal flow', () => {
-					test( 'adjusts the store on selctorMap change', () => {
-						const origSelectorMap = {
-							all: FULL_STATE_SELECTOR,
-							tags: 'tags'
-						};
-						type OrigSelectorMap = typeof origSelectorMap;
-						const _selectorMapOnRender = {
-							...selectorMapOnRender,
-							company: 'company'
-						};
-						const store = ctx.stream( origSelectorMap );
-						let _data : typeof mockGetReturnValue = store.data;
-						store.onDataChange = () => { _data = store.data };
-						store.selectorMap = _selectorMapOnRender as unknown as OrigSelectorMap;
-						expect( Object.keys( _data ) )
-							.toEqual( Object.keys( _selectorMapOnRender ));
-						store.selectorMap = selectorMapOnRerender as unknown as OrigSelectorMap;
-						expect( Object.keys( _data ) )
-							.toEqual( Object.keys( selectorMapOnRerender ));
-					});
-					test( 'destroys previous and obtains new connection', () => {
-						const cache = new AutoImmutable( createSourceData() );
-						const connection = cache.connect();
-						const disconnectSpy = jest.spyOn( connection, 'disconnect' );
-						const getSpy = jest
-							.spyOn( connection, 'get' )
-							.mockReturnValue( mockGetReturnValue );
-						const connectSpy = jest
-							.spyOn( cache, 'connect' )
-							.mockReturnValue( connection )
-						const cacheSpy = jest
-							.spyOn( AutoImmutableModule, 'default' )
-							.mockReturnValue( cache );
-						const mockUnsubscribe = jest.fn();
-						const mockSubscribe = jest.fn()
-							.mockReturnValue( mockUnsubscribe );
-
-						const store = ctx.stream( selectorMapOnRender );
-
-						expect( connectSpy ).toHaveBeenCalledTimes( 3 );
-						expect( mockSubscribe ).toHaveBeenCalledTimes( 1 );
-						expect( disconnectSpy ).not.toHaveBeenCalled();
-						expect( mockUnsubscribe ).not.toHaveBeenCalled();
-
-						store.selectorMap = selectorMapOnRerender as unknown as typeof selectorMapOnRender;
-						
-						expect( connectSpy ).toHaveBeenCalledTimes( 4 );
-						expect( mockSubscribe ).toHaveBeenCalledTimes( 2 );
-						expect( disconnectSpy ).toHaveBeenCalledTimes( 1 );
-						expect( mockUnsubscribe ).toHaveBeenCalledTimes( 1 );
-						
-						cacheSpy.mockRestore();
-
-						store.close();
-					});
-					describe( 'when the new selectorMap is not empty', () => {
-						test( 'refreshes state data', () => {
-							const cache = new AutoImmutable( createSourceData() );
-							const connection = cache.connect();
-							const getSpy = jest
-								.spyOn( connection, 'get' )
-								.mockReturnValue( mockGetReturnValue );
-							const connectSpy = jest
-								.spyOn( cache, 'connect' )
-								.mockReturnValue( connection )
-							const cacheSpy = jest
-								.spyOn( AutoImmutableModule, 'default' )
-								.mockReturnValue( cache );
-							expect( getSpy ).not.toHaveBeenCalled();
-
-							const store = ctx.stream( selectorMapOnRender );
-
-							expect( getSpy ).toHaveBeenCalledTimes( 2 );
-							expect( getSpy.mock.calls[ 1 ] ).toEqual(
-								Object.values( selectorMapOnRender )
-							);
-							getSpy.mockClear();
-
-							store.selectorMap = selectorMapOnRerender;
-
-							expect( getSpy ).toHaveBeenCalledTimes( 1 );
-							expect( getSpy ).toHaveBeenCalledWith(
-								...Object.values( selectorMapOnRerender )
-							);
-
-							cacheSpy.mockRestore();
-
-							store.close();
-						});
-						test( 'sets up new subscription with the consumer', () => {
-							const mockSubscribe = jest.fn()
-							const mockUnsubscribe = jest.fn();
-
-							class TestLiveStore<S extends SelectorMap> extends LiveStore<SourceData,S>{
-								public subscribe(){
-									mockSubscribe();
-									super.subscribe();
-								}
-								public unsubscribe() {
-									super.unsubscribe();
-									mockUnsubscribe();
-								}
-							}
-							interface TestBaseStream extends BaseStream<SourceData> {
-								<S extends SelectorMap>(selectorMap : S) : TestLiveStore<S>;
-							}
-							class TestEagleEyeContextClass extends EagleEyeContextClass<SourceData> {
-								protected initStream() {
-									this._stream = selectorMap => new TestLiveStore( this, selectorMap );
-								}
-							}
-
-							const ctx = new TestEagleEyeContextClass( sourceData );
-
-							const store = ctx.stream( selectorMapOnRender );
-
-							expect( mockSubscribe ).toHaveBeenCalledTimes( 1 );
-							expect( mockUnsubscribe ).not.toHaveBeenCalled();
-
-							store.selectorMap = selectorMapOnRerender;
-
-							expect( mockSubscribe ).toHaveBeenCalledTimes( 2 );
-							expect( mockUnsubscribe ).toHaveBeenCalledTimes( 1 );
-
-							store.close();
-							
-							ctx.dispose();
-						});
-					});
-				} );
-				describe( 'accepting an array of propertyPaths in place of a selector map', () => {
-					test( 'produces an indexed-based context state data object', () => {
-						const store = ctx.stream([
-							...Object.values( selectorMapOnRender ),
-							FULL_STATE_SELECTOR
-						]);
-						const stateSource = createSourceData();
-						expect( store.data ).toStrictEqual({
-							0: stateSource.history.places[ 2 ].year,
-							1: stateSource.isActive,
-							2: stateSource.tags[ 5 ],
-							3: stateSource
-						});
-					} );
-				} );
-				describe( 'when the new selectorMap is empty', () => {
-					describe( 'and existing data is not empty', () => {
-						test( 'adjusts the store on selctorMap change', () => {
-							const store = ctx.stream( selectorMapOnRender );
-							expect( Object.keys( store.data ) )
-								.toEqual( Object.keys( selectorMapOnRender ));
-							store.selectorMap = {} as unknown as typeof selectorMapOnRender
-							expect( store.data ).toEqual({});
-						} );
-						test( 'destroys previous and obtains new connection', () => {
-							const cache = new AutoImmutable( createSourceData() );
-							const connection = cache.connect();
-							const disconnectSpy = jest.spyOn( connection, 'disconnect' );
-							const getSpy = jest
-								.spyOn( connection, 'get' )
-								.mockReturnValue( mockGetReturnValue );
-							const connectSpy = jest
-								.spyOn( cache, 'connect' )
-								.mockReturnValue( connection );
-							const cacheSpy = jest
-								.spyOn( AutoImmutableModule, 'default' )
-								.mockReturnValue( cache );
-							const ctx = new EagleEyeContextClass( cache );
-							const streamSpy = jest
-								.spyOn( EagleEyeContextClass.prototype, 'stream' )
-								.mockReturnValue( new LiveStore( ctx ) );
-
-							const store = ctx.stream( selectorMapOnRender );
-
-							expect( connectSpy ).toHaveBeenCalledTimes( 3 );
-							expect( disconnectSpy ).not.toHaveBeenCalled();
-
-							connectSpy.mockClear();
-
-							store.selectorMap = selectorMapOnRerender;
-							
-							expect( connectSpy ).toHaveBeenCalledTimes( 1 );
-							expect( disconnectSpy ).toHaveBeenCalledTimes( 1 );
-
-							connectSpy.mockRestore();
-							disconnectSpy.mockRestore();
-							getSpy.mockRestore();
-							cacheSpy.mockRestore();
-							streamSpy.mockRestore();
-
-							store.close();
-
-							ctx.dispose();
-						} );
-						test( 'refreshes state data with empty object', async () => {
-							const cache = new AutoImmutable( createSourceData() );
-							const connection = cache.connect();
-							const getSpy = jest
-								.spyOn( connection, 'get' )
-								.mockReturnValue( mockGetReturnValue );
-							const connectSpy = jest
-								.spyOn( cache, 'connect' )
-								.mockReturnValue( connection );
-							const cacheSpy = jest
-								.spyOn( AutoImmutableModule, 'default' )
-								.mockReturnValue( cache );
-							const ctx = new EagleEyeContextClass( cache );
-							const streamSpy = jest
-								.spyOn( EagleEyeContextClass.prototype, 'stream' )
-								.mockReturnValue( new LiveStore( ctx ) );
-							expect( getSpy ).not.toHaveBeenCalled();
-							
-							const store = ctx.stream( selectorMapOnRender );
-
-							expect( getSpy ).toHaveBeenCalledTimes( 2 );
-							expect( getSpy.mock.calls[ 1 ] ).toEqual(
-								Object.values( selectorMapOnRender )
-							);
-							getSpy.mockClear();
-
-							store.selectorMap = undefined as unknown as typeof selectorMapOnRender;
-							
-							expect( getSpy ).not.toHaveBeenCalled();
-
-							expect( store.data ).toEqual({});
-
-							connectSpy.mockRestore();
-							getSpy.mockRestore();
-							cacheSpy.mockRestore();
-							streamSpy.mockRestore();
-
-							store.close();
-
-							ctx.dispose();
-						} );
-						test( 'does not set up new subscription with the consumer', () => {
-							const mockSubscribe = jest.fn()
-							const mockUnsubscribe = jest.fn();
-
-							class TestLiveStore<S extends SelectorMap> extends LiveStore<SourceData,S>{
-								public subscribe(){
-									mockSubscribe();
-									super.subscribe();
-								}
-								public unsubscribe() {
-									super.unsubscribe();
-									mockUnsubscribe();
-								}
-							}
-							interface TestBaseStream extends BaseStream<SourceData> {
-								<S extends SelectorMap>(selectorMap : S) : TestLiveStore<S>;
-							}
-							class TestEagleEyeContextClass extends EagleEyeContextClass<SourceData> {
-								protected initStream() {
-									this._stream = selectorMap => new TestLiveStore( this, selectorMap );
-								}
-							}
-
-							const ctx = new TestEagleEyeContextClass( sourceData );
-
-							const store = ctx.stream( selectorMapOnRender );
-
-							expect( mockSubscribe ).toHaveBeenCalledTimes( 1 );
-							expect( mockUnsubscribe ).not.toHaveBeenCalled();
-							mockSubscribe.mockClear();
-
-							store.selectorMap = undefined as unknown as typeof selectorMapOnRender;
-
-							expect( mockSubscribe ).not.toHaveBeenCalled();
-							expect( mockUnsubscribe ).toHaveBeenCalledTimes( 1 );
-
-							store.close();
-
-							ctx.dispose();
-						} );
-					} );
-					describe( 'and existing data is empty', () => {
-						test( 'leaves the store as-is on selctorMap change', () => {
-							let _origData : typeof mockGetReturnValue = {};
-							const store = ctx.stream();
-							expect( Object.keys( store.data ) ).toBe( 0 );
-							_origData = store.data as typeof mockGetReturnValue;
-							store.selectorMap = undefined;
-							expect( store.data ).toBe( _origData );
-							store.selectorMap = null as unknown as undefined;
-							expect( store.data ).toBe( _origData );
-							store.selectorMap = {};
-							expect( store.data ).toBe( _origData );
-							store.selectorMap = [];
-							expect( store.data ).toBe( _origData );
-							store.close();
-						} );
-						test( 'performs no state data update', async () => {
-							const cache = new AutoImmutable( createSourceData() );
-							const connection = cache.connect();
-							const getSpy = jest
-								.spyOn( connection, 'get' )
-								.mockReturnValue( mockGetReturnValue );
-							const connectSpy = jest
-								.spyOn( cache, 'connect' )
-								.mockReturnValue( connection );
-							const cacheSpy = jest
-								.spyOn( AutoImmutableModule, 'default' )
-								.mockReturnValue( cache );
-							const ctx = new EagleEyeContextClass( cache );
-							const streamSpy = jest
-								.spyOn( EagleEyeContextClass.prototype, 'stream' )
-								.mockReturnValue( new LiveStore( ctx ) );
-							expect( getSpy ).not.toHaveBeenCalled();
-							
-							const store = ctx.stream();
-
-							expect( getSpy ).not.toHaveBeenCalled();
-							expect( store.data ).toEqual({});
-							getSpy.mockClear();
-
-							const existingData = store.data;
-
-							store.selectorMap = undefined;
-
-							expect( getSpy ).not.toHaveBeenCalled();
-							expect( store.data ).toEqual( existingData );
-
-							connectSpy.mockRestore();
-							getSpy.mockRestore();
-							cacheSpy.mockRestore();
-							streamSpy.mockRestore();
-
-							store.close();
-
-							ctx.dispose();
-						} );
-						test( 'does not set up new subscription with the consumer', () => {
-							const mockSubscribe = jest.fn()
-							const mockUnsubscribe = jest.fn();
-
-							class TestLiveStore<S extends SelectorMap> extends LiveStore<SourceData,S>{
-								public subscribe(){
-									mockSubscribe();
-									super.subscribe();
-								}
-								public unsubscribe() {
-									super.unsubscribe();
-									mockUnsubscribe();
-								}
-							}
-							interface TestBaseStream extends BaseStream<SourceData> {
-								<S extends SelectorMap>(selectorMap : S) : TestLiveStore<S>;
-							}
-							class TestEagleEyeContextClass extends EagleEyeContextClass<SourceData> {
-								protected initStream() {
-									this._stream = selectorMap => new TestLiveStore( this, selectorMap );
-								}
-							}
-
-							const ctx = new TestEagleEyeContextClass( sourceData );
-
-							const store = ctx.stream();
-
-							expect( mockSubscribe ).not.toHaveBeenCalled();
-							expect( mockUnsubscribe ).not.toHaveBeenCalled();
-
-							store.selectorMap = {};
-
-							expect( mockSubscribe ).not.toHaveBeenCalled();
-							expect( mockUnsubscribe ).not.toHaveBeenCalled();
-
-							store.close();
-
-							ctx.dispose();
-						} );
-						describe( 'and previous property path is empty', () => {
-							test( 'skips refreshing connection: no previous connections to the consumer existed', () => {
-								const mockSubscribe = jest.fn()
-								const mockUnsubscribe = jest.fn();
-
-								class TestLiveStore<S extends SelectorMap> extends LiveStore<SourceData,S>{
-									public subscribe(){
-										mockSubscribe();
-										super.subscribe();
-									}
-									public unsubscribe() {
-										super.unsubscribe();
-										mockUnsubscribe();
-									}
-								}
-								interface TestBaseStream extends BaseStream<SourceData> {
-									<S extends SelectorMap>(selectorMap : S) : TestLiveStore<S>;
-								}
-								class TestEagleEyeContextClass extends EagleEyeContextClass<SourceData> {
-									protected initStream() {
-										this._stream = selectorMap => new TestLiveStore( this, selectorMap );
-									}
-								}
-
-								const cache = new AutoImmutable( createSourceData() );
-								const connection = cache.connect();
-								const disconnectSpy = jest.spyOn( connection, 'disconnect' );
-								const getSpy = jest
-									.spyOn( connection, 'get' )
-									.mockReturnValue( mockGetReturnValue );
-								const connectSpy = jest
-									.spyOn( cache, 'connect' )
-									.mockReturnValue( connection );
-
-								const ctx = new TestEagleEyeContextClass( cache );
-
-								const store = ctx.stream( selectorMapOnRender );
-
-								expect( connectSpy ).toHaveBeenCalledTimes( 3 );
-								expect( mockSubscribe ).not.toHaveBeenCalled();
-								expect( disconnectSpy ).not.toHaveBeenCalled();
-								expect( mockUnsubscribe ).not.toHaveBeenCalled();
-								connectSpy.mockClear();
-
-								store.selectorMap = {} as unknown as typeof selectorMapOnRender;
-
-								expect( connectSpy ).not.toHaveBeenCalled();
-								expect( mockSubscribe ).not.toHaveBeenCalled();
-								expect( disconnectSpy ).not.toHaveBeenCalled();
-								expect( mockUnsubscribe ).not.toHaveBeenCalled();
-
-								connectSpy.mockRestore();
-								disconnectSpy.mockRestore();
-								getSpy.mockRestore();
-
-								store.close();
-
-								ctx.dispose();
-							} );
-						} );
-					} );
-				} );
-			} );
 			describe( 'store.setState', () => {
 				let ctx : EagleEyeContextClass<Partial<SourceData>>;
 				beforeEach(() => {
@@ -1744,355 +1385,6 @@ describe( 'EagleEyeContext', () => {
 
 
 describe( 'ReactObservableContext', () => {
-	test( 'throws usage error on attempts to use context store outside of the Provider component tree', () => {
-		// note: TallyDisplay component utilizes the ReactObservableContext store
-		expect(() => render( <TallyDisplay /> )).toThrow( UsageError );
-	} );
-	describe( 'store updates from within the Provider tree', () => {
-		describe( 'updates only subscribed components', () => {
-			describe( 'using connected store subscribers', () => {
-				test( 'scenario 1', async () => {
-					const { renderCount } : PerfValue = perf( React );
-					render( <AppWithConnectedChildren /> );
-					let baseRenderCount : Record<string,any>;
-					await wait(() => { baseRenderCount = transformRenderCount( renderCount ) });
-					fireEvent.change( screen.getByLabelText( 'New Price:' ), { target: { value: '123' } } );
-					fireEvent.click( screen.getByRole( 'button', { name: 'update price' } ) );
-					await wait(() => {
-						const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-						expect( netCount.CustomerPhoneDisplay ).toBe( 0 ); // unaffected: no use for price data
-						expect( netCount.Editor ).toBe( 0 ); // unaffected: no use for price data
-						expect( netCount.PriceSticker ).toBe( 1 );
-						expect( netCount.ProductDescription ).toBe( 0 ); // unaffected: no use for price data
-						expect( netCount.Reset ).toBe( 0 ); // unaffected: no use for price data
-						expect( netCount.TallyDisplay ).toBe( 1 );
-					});
-					cleanupPerfTest();
-				} );
-				test( 'scenario 2', async () => {
-					const { renderCount } : PerfValue = perf( React );
-					render( <AppWithConnectedChildren /> );
-					let baseRenderCount : Record<string,any>;
-					await wait(() => { baseRenderCount = transformRenderCount( renderCount ) });
-					fireEvent.change( screen.getByLabelText( 'New Color:' ), { target: { value: 'Navy' } } );
-					fireEvent.click( screen.getByRole( 'button', { name: 'update color' } ) );
-					await wait(() => {
-						const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-						expect( netCount.CustomerPhoneDisplay ).toBe( 0 ); // unaffected: no use for product color data
-						expect( netCount.Editor ).toBe( 0 ); // unaffected: no use for product color data
-						expect( netCount.PriceSticker ).toBe( 0 ); // unaffected: no use for product color data
-						expect( netCount.ProductDescription ).toBe( 1 );
-						expect( netCount.Reset ).toBe( 0 ); // unaffected: no use for product color data
-						expect( netCount.TallyDisplay ).toBe( 1 );
-					});
-					cleanupPerfTest();
-				} );
-				test( 'scenario 3', async () => {
-					const { renderCount } : PerfValue = perf( React );
-					render( <AppWithConnectedChildren /> );
-					let baseRenderCount : Record<string,any>;
-					await wait(() => { baseRenderCount = transformRenderCount( renderCount ) });
-					fireEvent.change( screen.getByLabelText( 'New Type:' ), { target: { value: 'Bag' } } );
-					fireEvent.click( screen.getByRole( 'button', { name: 'update type' } ) );
-					await wait(() => {
-						const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-						expect( netCount.CustomerPhoneDisplay ).toBe( 0 ); // unaffected: no use for product type data
-						expect( netCount.Editor ).toBe( 0 ); // unaffected: no use for product type data
-						expect( netCount.PriceSticker ).toBe( 0 ); // unaffected: no use for product type data
-						expect( netCount.ProductDescription ).toBe( 1 );
-						expect( netCount.Reset ).toBe( 0 ); // unaffected: no use for product type data
-						expect( netCount.TallyDisplay ).toBe( 1 );
-					});
-					cleanupPerfTest();
-				} );
-				test( 'does not render subscribed components for resubmitted changes', async () => {
-					const { renderCount } : PerfValue = perf( React );
-					render( <AppWithConnectedChildren /> );
-					fireEvent.change( screen.getByLabelText( 'New Type:' ), { target: { value: 'Bag' } } );
-					fireEvent.click( screen.getByRole( 'button', { name: 'update type' } ) );
-					let baseRenderCount : Record<string,any>;
-					await wait(() => { baseRenderCount = transformRenderCount( renderCount ) });
-					fireEvent.change( screen.getByLabelText( 'New Type:' ), { target: { value: 'Bag' } } );
-					fireEvent.click( screen.getByRole( 'button', { name: 'update type' } ) );
-					await wait(() => {
-						const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-						expect( netCount.CustomerPhoneDisplay ).toBe( 0 ); // unaffected: no new product type data
-						expect( netCount.Editor ).toBe( 0 ); // unaffected: no new product type data
-						expect( netCount.PriceSticker ).toBe( 0 ); // unaffected: no new product type data
-						expect( netCount.ProductDescription ).toBe( 0 ); // unaffected: no new product type data
-						expect( netCount.Reset ).toBe( 0 ); // unaffected: no new product type data
-						expect( netCount.TallyDisplay ).toBe( 0 ); // unaffected: no new product type data
-					});
-					cleanupPerfTest();
-				} );
-			} );
-	 		describe( 'using pure-component store subscribers', () => {
-				test( 'scenario 1', async () => {
-					const { renderCount } : PerfValue = perf( React );
-					render( <AppWithPureChildren /> );
-					let baseRenderCount : Record<string,any>;
-					await wait(() => { baseRenderCount = transformRenderCount( renderCount ) });
-					fireEvent.change( screen.getByLabelText( 'New Price:' ), { target: { value: '123' } } );
-					fireEvent.click( screen.getByRole( 'button', { name: 'update price' } ) );
-					await wait(() => {
-						const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-						expect( netCount.CustomerPhoneDisplay ).toBe( 0 ); // unaffected: no use for price data
-						expect( netCount.Editor ).toBe( 0 ); // unaffected: no use for price data
-						expect( netCount.PriceSticker ).toBe( 1 );
-						expect( netCount.ProductDescription ).toBe( 0 ); // unaffected: no use for price data
-						expect( netCount.Reset ).toBe( 0 ); // unaffected: no use for price data
-						expect( netCount.TallyDisplay ).toBe( 1 );
-					});
-					cleanupPerfTest();
-				} );
-				test( 'scenario 2', async () => {
-					const { renderCount } : PerfValue = perf( React );
-					render( <AppWithPureChildren /> );
-					let baseRenderCount : Record<string,any>;
-					await wait(() => { baseRenderCount = transformRenderCount( renderCount ) });
-					fireEvent.change( screen.getByLabelText( 'New Color:' ), { target: { value: 'Navy' } } );
-					fireEvent.click( screen.getByRole( 'button', { name: 'update color' } ) );
-					await wait(() => {
-						const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-						expect( netCount.CustomerPhoneDisplay ).toBe( 0 ); // unaffected: no use for product color data
-						expect( netCount.Editor ).toBe( 0 ); // unaffected: no use for product color data
-						expect( netCount.PriceSticker ).toBe( 0 ); // unaffected: no use for product color data
-						expect( netCount.ProductDescription ).toBe( 1 );
-						expect( netCount.Reset ).toBe( 0 ); // unaffected: no use for product color data
-						expect( netCount.TallyDisplay ).toBe( 1 );
-					});
-					cleanupPerfTest();
-				} );
-				test( 'scenario 3', async () => {
-					const { renderCount } : PerfValue = perf( React );
-					render( <AppWithPureChildren /> );
-					let baseRenderCount : Record<string,any>;
-					await wait(() => { baseRenderCount = transformRenderCount( renderCount ) });
-					fireEvent.change( screen.getByLabelText( 'New Type:' ), { target: { value: 'Bag' } } );
-					fireEvent.click( screen.getByRole( 'button', { name: 'update type' } ) );
-					await wait(() => {
-						const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-						expect( netCount.CustomerPhoneDisplay ).toBe( 0 ); // unaffected: no use for product type data
-						expect( netCount.Editor ).toBe( 0 ); // unaffected: no use for product type data
-						expect( netCount.PriceSticker ).toBe( 0 ); // unaffected: no use for product type data
-						expect( netCount.ProductDescription ).toBe( 1 );
-						expect( netCount.Reset ).toBe( 0 ); // unaffected: no use for product type data
-						expect( netCount.TallyDisplay ).toBe( 1 );
-					});
-					cleanupPerfTest();
-				} );
-				test( 'does not render subscribed components for resubmitted changes', async () => {
-					const { renderCount } : PerfValue = perf( React );
-					render( <AppWithPureChildren /> );
-					fireEvent.change( screen.getByLabelText( 'New Type:' ), { target: { value: 'Bag' } } );
-					fireEvent.click( screen.getByRole( 'button', { name: 'update type' } ) );
-					let baseRenderCount : Record<string,any>;
-					await wait(() => { baseRenderCount = transformRenderCount( renderCount ) });
-					fireEvent.change( screen.getByLabelText( 'New Type:' ), { target: { value: 'Bag' } } );
-					fireEvent.click( screen.getByRole( 'button', { name: 'update type' } ) );
-					await wait(() => {
-						const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-						expect( netCount.CustomerPhoneDisplay ).toBe( 0 );
-						expect( netCount.Editor ).toBe( 0 );
-						expect( netCount.PriceSticker ).toBe( 0 );
-						expect( netCount.ProductDescription ).toBe( 0 ); // unaffected: no new product type data
-						expect( netCount.Reset ).toBe( 0 );
-						expect( netCount.TallyDisplay ).toBe( 0 ); // unaffected: no new product type data
-					});
-					cleanupPerfTest();
-				} );
-			} );
-			describe( 'using non pure-component store subscribers', () => {
-				test( 'scenario 1', async () => {
-					const { renderCount } : PerfValue = perf( React );
-					render( <AppNormal /> );
-					let baseRenderCount : Record<string,any>;
-					await wait(() => { baseRenderCount = transformRenderCount( renderCount ) });
-					fireEvent.change( screen.getByLabelText( 'New Price:' ), { target: { value: '123' } } );
-					fireEvent.click( screen.getByRole( 'button', { name: 'update price' } ) );
-					await wait(() => {
-						const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-						expect( netCount.CustomerPhoneDisplay ).toBe( 1 ); // UPDATED BY REACT PROPAGATION (b/c no memoization)
-						expect( netCount.Editor ).toBe( 0 ); // unaffected: no use for product price data
-						expect( netCount.PriceSticker ).toBe( 1 );
-						expect( netCount.ProductDescription ).toBe( 0 ); // unaffected: no use for product price data
-						expect( netCount.Reset ).toBe( 1 ); // UPDATED BY REACT PROPAGATION (b/c no memoization)
-						expect( netCount.TallyDisplay ).toBe( 1 );
-					});
-					cleanupPerfTest();
-				} );
-				test( 'scenario 2', async () => {
-					const { renderCount } : PerfValue = perf( React );
-					render( <AppNormal /> );
-					let baseRenderCount : Record<string,any>;
-					await wait(() => { baseRenderCount = transformRenderCount( renderCount ) });
-					fireEvent.change( screen.getByLabelText( 'New Color:' ), { target: { value: 'Navy' } } );
-					fireEvent.click( screen.getByRole( 'button', { name: 'update color' } ) );
-					await wait(() => {
-						const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-						expect( netCount.CustomerPhoneDisplay ).toBe( 1 ); // UPDATED BY REACT PROPAGATION (b/c no memoization)
-						expect( netCount.Editor ).toBe( 0 ); // unaffected: no use for product price data
-						expect( netCount.PriceSticker ).toBe( 0 ); // unaffected: no use for product price data
-						expect( netCount.ProductDescription ).toBe( 1 );
-						expect( netCount.Reset ).toBe( 1 ); // UPDATED BY REACT PROPAGATION (b/c no memoization)
-						expect( netCount.TallyDisplay ).toBe( 1 );
-					});
-					cleanupPerfTest();
-				} );
-				test( 'scenario 3', async () => {
-					const { renderCount } : PerfValue = perf( React );
-					render( <AppNormal /> );
-					let baseRenderCount : Record<string,any>;
-					await wait(() => { baseRenderCount = transformRenderCount( renderCount ) });
-					fireEvent.change( screen.getByLabelText( 'New Type:' ), { target: { value: 'Bag' } } );
-					fireEvent.click( screen.getByRole( 'button', { name: 'update type' } ) );
-					await wait(() => {
-						const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-						expect( netCount.CustomerPhoneDisplay ).toBe( 1 ); // UPDATED BY REACT PROPAGATION (b/c no memoization)
-						expect( netCount.Editor ).toBe( 0 ); // unaffected: no use for product type data
-						expect( netCount.PriceSticker ).toBe( 0 ); // unaffected: no use for product type data
-						expect( netCount.ProductDescription ).toBe( 1 );
-						expect( netCount.Reset ).toBe( 1 ); // UPDATED BY REACT PROPAGATION (b/c no memoization)
-						expect( netCount.TallyDisplay ).toBe( 1 );
-					});
-					cleanupPerfTest();
-				} );
-				test( 'does not render resubmitted changes', async () => {
-					const { renderCount } : PerfValue = perf( React );
-					render( <AppNormal /> );
-					fireEvent.change( screen.getByLabelText( 'New Type:' ), { target: { value: 'Bag' } } );
-					fireEvent.click( screen.getByRole( 'button', { name: 'update type' } ) );
-					let baseRenderCount : Record<string,any>;
-					await wait(() => { baseRenderCount = transformRenderCount( renderCount ) });
-					fireEvent.change( screen.getByLabelText( 'New Type:' ), { target: { value: 'Bag' } } );
-					fireEvent.click( screen.getByRole( 'button', { name: 'update type' } ) );
-					await wait(() => {
-						const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-						expect( netCount.CustomerPhoneDisplay ).toBe( 0 );
-						expect( netCount.Editor ).toBe( 0 );
-						expect( netCount.PriceSticker ).toBe( 0 );
-						expect( netCount.ProductDescription ).toBe( 0 ); // unaffected: no new product type data
-						expect( netCount.Reset ).toBe( 0 );
-						expect( netCount.TallyDisplay ).toBe( 0 ); // unaffected: no new product type data
-					});
-					cleanupPerfTest();
-				} );
-			} );
-		} );
-	} );
-	describe( 'store updates from outside the Provider tree', () => {
-		describe( 'with connected component children', () => {
-			test( 'only re-renders Provider children affected by the Provider parent prop change', async () => {
-				const { renderCount } : PerfValue = perf( React );
-				render( <AppWithConnectedChildren /> );
-				let baseRenderCount : Record<string,any>;
-				await wait(() => { baseRenderCount = transformRenderCount( renderCount ); });
-				fireEvent.keyUp( screen.getByLabelText( 'Type:' ), { target: { value: 'A' } } );
-				await wait(() => {
-					const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-					expect( netCount.CustomerPhoneDisplay ).toBe( 0 ); // unaffected: no use for product type data
-					expect( netCount.Editor ).toBe( 0 ); // unaffected: no use for product type data
-					expect( netCount.PriceSticker ).toBe( 0 ); // unaffected: no use for product type data
-					expect( netCount.ProductDescription ).toBe( 1 );
-					expect( netCount.Reset ).toBe( 0 ); // unaffected: no use for product type data
-					expect( netCount.TallyDisplay ).toBe( 1 );
-				});
-				cleanupPerfTest();
-			} );
-			test( 'only re-renders parts of the Provider tree directly affected by the Provider parent state update', async () => {
-				const { renderCount } : PerfValue = perf( React );
-				render( <AppWithConnectedChildren /> );
-				let baseRenderCount : Record<string,any>;
-				await wait(() => { baseRenderCount = transformRenderCount( renderCount ) });
-				fireEvent.keyUp( screen.getByLabelText( '$', {
-					key: '5',
-					code: 'Key5'
-				} as SelectorMatcherOptions ) );
-				await wait(() => {
-					const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-					expect( netCount.CustomerPhoneDisplay ).toBe( 0 ); // unaffected: no use for product price data
-					expect( netCount.Editor ).toBe( 0 ); // unaffected: no use for product price data
-					expect( netCount.PriceSticker ).toBe( 1 );
-					expect( netCount.ProductDescription ).toBe( 0 ); // unaffected: no use for product price data
-					expect( netCount.Reset ).toBe( 0 ); // unaffected: no use for product price data
-					expect( netCount.TallyDisplay ).toBe( 1 );
-				});
-				cleanupPerfTest();
-			} );
-	 	} );
-		describe( 'with pure-component children', () => {
-			test( 'only re-renders Provider children affected by the Provider parent prop change', async () => {
-				const { renderCount } : PerfValue = perf( React );
-				render( <AppWithPureChildren /> );
-				let baseRenderCount : Record<string,any>;
-				await wait(() => { baseRenderCount = transformRenderCount( renderCount ); });
-				fireEvent.keyUp( screen.getByLabelText( 'Type:' ), { target: { value: 'A' } } );
-				await wait(() => {
-					const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-					expect( netCount.CustomerPhoneDisplay ).toBe( 0 ); // unaffected: no use for product type data
-					expect( netCount.Editor ).toBe( 0 ); // unaffected: no use for product type data
-					expect( netCount.PriceSticker ).toBe( 0 ); // unaffected: no use for product type data
-					expect( netCount.ProductDescription ).toBe( 1 );
-					expect( netCount.Reset ).toBe( 0 ); // unaffected: no use for product type data
-					expect( netCount.TallyDisplay ).toBe( 1 );
-				});
-				cleanupPerfTest();
-			} );
-			test( 'only re-renders parts of the Provider tree directly affected by the Provider parent state update', async () => {
-				const { renderCount } : PerfValue = perf( React );
-				render( <AppWithPureChildren /> );
-				let baseRenderCount : Record<string,any>;
-				await wait(() => { baseRenderCount = transformRenderCount( renderCount ); });
-				fireEvent.keyUp( screen.getByLabelText( '$', { key: '5', code: 'Key5' } as SelectorMatcherOptions ) );
-				await wait(() => {
-					const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-					expect( netCount.CustomerPhoneDisplay ).toBe( 0 ); // unaffected: no use for product price data
-					expect( netCount.Editor ).toBe( 0 ); // unaffected: no use for product price data
-					expect( netCount.PriceSticker ).toBe( 1 );
-					expect( netCount.ProductDescription ).toBe( 0 ); // unaffected: no use for product price data
-					expect( netCount.Reset ).toBe( 0 ); // unaffected: no use for product price data
-					expect( netCount.TallyDisplay ).toBe( 1 );
-				});
-				cleanupPerfTest();
-			} );
-		} );
-		describe( 'with non pure-component children ', () => {
-			test( 'only re-renders Provider children affected by the Provider parent prop change', async () => {
-				const { renderCount } : PerfValue = perf( React );
-				render( <AppNormal /> );
-				let baseRenderCount : Record<string,any>;
-				await wait(() => { baseRenderCount = transformRenderCount( renderCount ); });
-				fireEvent.keyUp( screen.getByLabelText( 'Type:' ), { target: { value: 'A' } } );
-				await wait(() => {
-					const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-					expect( netCount.CustomerPhoneDisplay ).toBe( 1 ); // UPDATED BY REACT PROPAGATION (b/c no memoization)
-					expect( netCount.Editor ).toBe( 0 ); // unaffected: no use for product type data
-					expect( netCount.PriceSticker ).toBe( 0 ); // unaffected: no use for product type data
-					expect( netCount.ProductDescription ).toBe( 1 );
-					expect( netCount.Reset ).toBe( 1 ); // UPDATED BY REACT PROPAGATION (b/c no memoization)
-					expect( netCount.TallyDisplay ).toBe( 1 );
-				});
-				cleanupPerfTest();
-			} );
-			test( 'oonly re-renders parts of the Provider tree directly affected by the Provider parent state update', async () => {
-				const { renderCount } : PerfValue = perf( React );
-				render( <AppNormal /> );
-				let baseRenderCount : Record<string,any>;
-				await wait(() => { baseRenderCount = transformRenderCount( renderCount ); });
-				fireEvent.keyUp( screen.getByLabelText( '$', { key: '5', code: 'Key5' } as SelectorMatcherOptions ) );
-				await wait(() => {
-					const netCount = transformRenderCount( renderCount, baseRenderCount ) as any;
-					expect( netCount.CustomerPhoneDisplay ).toBe( 1 ); // UPDATED BY REACT PROPAGATION (b/c no memoization)
-					expect( netCount.Editor ).toBe( 0 ); // unaffected: no use for product price data
-					expect( netCount.PriceSticker ).toBe( 1 );
-					expect( netCount.ProductDescription ).toBe( 0 ); // unaffected: no use for product price data
-					expect( netCount.Reset ).toBe( 1 ); // UPDATED BY REACT PROPAGATION (b/c no memoization)
-					expect( netCount.TallyDisplay ).toBe( 1 );
-				});
-				cleanupPerfTest();
-			} );
-		} );
-	} );
 	describe( 'accessing store externally through its provider', () => {
 		const sourceData = createSourceData();
 		let storeRef : React.RefObject<StoreRef<Partial<SourceData>>>;
