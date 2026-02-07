@@ -165,6 +165,8 @@ export interface Store<
 };
 
 export interface StoreRef<T extends State = State> extends IStore<T>{
+    close : () => void;
+    closed : boolean;
     getState : (propertyPaths?: Array<string>) => T;
     subscribe : {
         (eventType: "closing", listener: ShutdownMonitor) : Unsubscribe;

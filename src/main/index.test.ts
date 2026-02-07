@@ -103,16 +103,22 @@ describe( 'EagleEyeContext', () => {
 		let context : EagleEyeContextClass;
 		beforeAll(() => { context = new EagleEyeContextClass() });
 		afterAll(() => { context.dispose() });
-		test( 'produces access to the existing externally available store by default', () => {
-			expect( context.createStoreRef() ).toBe( context.store );
-			expect( context.createStoreRef( undefined, ACCESS_SYM ) ).toBe( context.store );
-		} );
-		test( 'requires the proper access token produces access token to create dedicated store referneces', () => {
-			const newConnection = context.cache.connect();
-			expect(() => context.createStoreRef( newConnection )).toThrow(
+		test( 'throws exception by default', () => {
+			expect(() => context.createStoreRef()).toThrow(
 				'May not create store reference out of context. Plese use `this.store` to obtain externally available store reference.'	
 			);
-			const newStoreRef = context.createStoreRef( newConnection, ACCESS_SYM );
+		} );
+		test( 'requires the proper access token to create dedicated store referneces', () => {
+			expect(() => context.createStoreRef( Symbol( ACCESS_SYM.description ) )).toThrow(
+				'May not create store reference out of context. Plese use `this.store` to obtain externally available store reference.'	
+			);
+			expect(() => context.createStoreRef( Symbol( ACCESS_SYM.toString() ) )).toThrow(
+				'May not create store reference out of context. Plese use `this.store` to obtain externally available store reference.'	
+			);
+			expect(() => context.createStoreRef( ACCESS_SYM.valueOf() )).toThrow(
+				'May not create store reference out of context. Plese use `this.store` to obtain externally available store reference.'	
+			);
+			const newStoreRef = context.createStoreRef( ACCESS_SYM );
 			expect( newStoreRef ).not.toBe( context.store );
 			expect( context.store ).toEqual({
 				resetState: expect.any( Function ),
@@ -1854,7 +1860,9 @@ describe( 'EagleEyeContext', () => {
 						ctx = new EagleEyeContextClass<Partial<SourceData>>( createSourceData() );
 					});
 					afterEach(() =>  { ctx.dispose() });
-					test( 'commits any updates to the context', () => {
+					// @debug
+					test( '1xxxx', () => {
+					// test( 'commits any updates to the context', () => {
 						const store = ctx.stream();
 						const defaultState = createSourceData();
 						expect( store.data ).toEqual({}); // no selectormap under observation
@@ -1864,7 +1872,7 @@ describe( 'EagleEyeContext', () => {
 							isActive: true,
 							history: {
 								places: {
-									2: {
+									'2': {
 										city: 'Marakesh',
 										country: 'Morocco'
 									}  as SourceData["history"]["places"][0]
@@ -1878,10 +1886,16 @@ describe( 'EagleEyeContext', () => {
 						expectedValue.history.places[ 2 ].country = 'Morocco';
 						expectedValue.isActive = true;
 						expectedValue.tags = [ 0, 1, 2, 4, 6 ].map( i => defaultState.tags[ i ] );
+
+
+						// @debug
+						console.info( '>>>>>>>>>>>>>>>>> ', JSON.stringify( ctx.store.getState(), null, 2 ) );
+
+
 						expect( ctx.store.getState() ).toEqual( expectedValue );
 						expect( store.data ).toEqual({}); // no selectormap under observation
 						store.close();
-					});
+					} );
 				} );
 			} );
 		} );
