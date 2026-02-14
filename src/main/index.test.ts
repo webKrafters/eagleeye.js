@@ -41,6 +41,17 @@ import {
 
 const { default: AutoImmutable } = AutoImmutableModule;
 
+function getMockStorage<T extends State>( data : Partial<T> ) {
+	return {
+		clone: jest.fn().mockReturnValue( clonedeep( data ) ),
+		getItem: jest.fn().mockReturnValue( data ),
+		removeItem: jest.fn().mockImplementation( k => {
+			data = null as unknown as typeof data;
+		}),
+		setItem: jest.fn().mockImplementation(( k, v ) => { data = v })
+	} as IStorage<T>
+}
+
 describe( 'EagleEyeContext', () => {
 	let data : SourceData;
 	let immutable : Immutable<SourceData>;
@@ -49,21 +60,24 @@ describe( 'EagleEyeContext', () => {
 		immutable = new AutoImmutable( data );
 	});
 	describe( 'creation: all parameters are optional', () => {
+		let storage : IStorage<SourceData>;
+		beforeEach(() => { storage = getMockStorage( null as unknown as Partial<SourceData> ) });
+		afterEach(() => { storage = null as unknown as typeof storage })
 		test( 'can be instantiated when state data is not yet available', () => {
 			expect( new EagleEyeContextClass() ).toBeInstanceOf( EagleEyeContextClass );
-			expect( new EagleEyeContextClass<SourceData>( undefined, {}, {} as IStorage<SourceData> ) ).toBeInstanceOf( EagleEyeContextClass );
-			expect( new EagleEyeContextClass<SourceData>( undefined, undefined, {} as IStorage<SourceData> ) ).toBeInstanceOf( EagleEyeContextClass );
+			expect( new EagleEyeContextClass<SourceData>( undefined, {}, storage ) ).toBeInstanceOf( EagleEyeContextClass );
+			expect( new EagleEyeContextClass<SourceData>( undefined, undefined, storage ) ).toBeInstanceOf( EagleEyeContextClass );
 		} );
 		test( 'can be instantiated with a known default state data', () => {
-			expect( new EagleEyeContextClass<SourceData>( data, {}, {} as IStorage<SourceData> ) ).toBeInstanceOf( EagleEyeContextClass );
+			expect( new EagleEyeContextClass<SourceData>( data, {}, storage ) ).toBeInstanceOf( EagleEyeContextClass );
 			expect( new EagleEyeContextClass<SourceData>( data, {} ) ).toBeInstanceOf( EagleEyeContextClass );
-			expect( new EagleEyeContextClass<SourceData>( data, undefined, {} as IStorage<SourceData> ) ).toBeInstanceOf( EagleEyeContextClass );
+			expect( new EagleEyeContextClass<SourceData>( data, undefined, storage ) ).toBeInstanceOf( EagleEyeContextClass );
 			expect( new EagleEyeContextClass<SourceData>( data ) ).toBeInstanceOf( EagleEyeContextClass );
 		} );
 		test( 'can be instantiated with an existing immutable state data', () => {
-			expect( new EagleEyeContextClass<SourceData>( immutable, {}, {} as IStorage<SourceData> ) ).toBeInstanceOf( EagleEyeContextClass );
+			expect( new EagleEyeContextClass<SourceData>( immutable, {}, storage ) ).toBeInstanceOf( EagleEyeContextClass );
 			expect( new EagleEyeContextClass<SourceData>( immutable, {} ) ).toBeInstanceOf( EagleEyeContextClass );
-			expect( new EagleEyeContextClass<SourceData>( immutable, undefined, {} as IStorage<SourceData> ) ).toBeInstanceOf( EagleEyeContextClass );
+			expect( new EagleEyeContextClass<SourceData>( immutable, undefined, storage ) ).toBeInstanceOf( EagleEyeContextClass );
 			expect( new EagleEyeContextClass<SourceData>( immutable ) ).toBeInstanceOf( EagleEyeContextClass );
 		} );
 		test( 'can be obtained through the create function when default state data unknown', () => {
@@ -75,12 +89,12 @@ describe( 'EagleEyeContext', () => {
 				value: data
 			}) ).toBeInstanceOf( EagleEyeContextClass );
 			expect( createEagleEye({
-				storage: {} as IStorage<SourceData>,
+				storage,
 				value: data
 			}) ).toBeInstanceOf( EagleEyeContextClass );
 			expect( createEagleEye({
 				prehooks: {},
-				storage: {} as IStorage<SourceData>,
+				storage,
 				value: data
 			}) ).toBeInstanceOf( EagleEyeContextClass );
 		} );
@@ -89,12 +103,12 @@ describe( 'EagleEyeContext', () => {
 				value: immutable
 			}) ).toBeInstanceOf( EagleEyeContextClass );
 			expect( createEagleEye({
-				storage: {} as IStorage<SourceData>,
+				storage,
 				value: immutable
 			}) ).toBeInstanceOf( EagleEyeContextClass );
 			expect( createEagleEye({
 				prehooks: {},
-				storage: {} as IStorage<SourceData>,
+				storage,
 				value: immutable
 			}) ).toBeInstanceOf( EagleEyeContextClass );
 		} );
@@ -115,18 +129,19 @@ describe( 'EagleEyeContext', () => {
 			expect(() => context.createStoreRef( Symbol( ACCESS_SYM.toString() ) )).toThrow(
 				'May not create store reference out of context. Plese use `this.store` to obtain externally available store reference.'	
 			);
-			expect(() => context.createStoreRef( ACCESS_SYM.valueOf() )).toThrow(
-				'May not create store reference out of context. Plese use `this.store` to obtain externally available store reference.'	
-			);
 			const newStoreRef = context.createStoreRef( ACCESS_SYM );
 			expect( newStoreRef ).not.toBe( context.store );
 			expect( context.store ).toEqual({
+    			close: expect.any( Function ),
+    			closed: expect.any( Boolean ),
 				resetState: expect.any( Function ),
 				setState: expect.any( Function ),
 				getState: expect.any( Function ),
 				subscribe: expect.any( Function )
 			})
 			expect( newStoreRef ).toEqual({
+    			close: expect.any( Function ),
+    			closed: expect.any( Boolean ),
 				resetState: expect.any( Function ),
 				setState: expect.any( Function ),
 				getState: expect.any( Function ),
@@ -151,19 +166,12 @@ describe( 'EagleEyeContext', () => {
 		} );
 	});
 	describe( 'properties', () => {
-		interface Storage extends IStorage<SourceData> { _data : SourceData }
-		let storage : Storage;
+		let storage : IStorage<SourceData>;
 		let sourceData : SourceData;
 		let context : EagleEyeContextClass<SourceData>;
 		let prehooks : Prehooks<SourceData>;
 		beforeAll(() => {
-			storage = {
-				_data: undefined as unknown as SourceData,
-				clone( data ){ return clonedeep( this._data ) },
-				getItem(){ return this._data },
-				removeItem(){ this._data = undefined as unknown as SourceData },
-				setItem( key, data ){ this._data = data }
-			};
+			storage = getMockStorage( null as unknown as Partial<SourceData> );
 			prehooks = {};
 			sourceData = createSourceData();
 			context = new EagleEyeContextClass( sourceData, prehooks, storage );
@@ -187,33 +195,48 @@ describe( 'EagleEyeContext', () => {
 
 				const cache = new AutoImmutable({});
 				let connection = cache.connect();
+						
 				ctx = new EagleEyeContextClass( cache );
 				expect( ctx.closed ).toBe( false );
 				ctx.store.setState({ a: 44 });
-				let state = connection.get( AutoImmutableModule.GLOBAL_SELECTOR );
-				expect( state ).toEqual({ a: 44 });
-				cache.close();
+				let state = connection.get();
+				expect( state ).toEqual({
+					[ AutoImmutableModule.GLOBAL_SELECTOR ] :{
+						a: 44
+					}
+				});
+				
+				ctx.dispose();
+				expect( cache.closed ).toBe( false );
 				expect( ctx.closed ).toBe( true );
+				expect( ctx.store.closed ).toBe( true );
+
 				// lost connection to the underlying cache
 				ctx.store.setState({ c: 66 });
 				expect( ctx.store.getState() ).toBeUndefined();
-				expect( state ).toBe(
-					connection.get( AutoImmutableModule.GLOBAL_SELECTOR )
+				expect( state[ AutoImmutableModule.GLOBAL_SELECTOR ] ).toBe(
+					connection.get()[ AutoImmutableModule.GLOBAL_SELECTOR ]
 				);
 
 				// create new context to consume same cache
 				ctx = new EagleEyeContextClass( cache );
-				expect( ctx.closed ).toBe( false );
 				ctx.store.setState({ c: 66 });
-				state = connection.get( AutoImmutableModule.GLOBAL_SELECTOR );
-				expect( state ).toEqual({ a: 44, c: 66 });
+				state = connection.get();
+				expect( state ).toEqual({
+					[ AutoImmutableModule.GLOBAL_SELECTOR ] :{
+						a: 44,
+						c: 66
+					}
+				});
+
 				cache.close(); // cache closing automatically closes the context
+				expect( cache.closed ).toBe( true );
 				expect( ctx.closed ).toBe( true );
+				expect( ctx.store.closed ).toBe( true );
+
 				// lost connection to the underlying cache
 				ctx.store.setState({ c: 66 });
-				expect(
-					connection.get( AutoImmutableModule.GLOBAL_SELECTOR )
-				).toBeUndefined();
+				expect( connection.get() ).toBeUndefined();
 				expect( ctx.store.getState() ).toBeUndefined();
 			} );
 		} );
@@ -270,7 +293,7 @@ describe( 'EagleEyeContext', () => {
 						expect( connectSetSpy ).toHaveBeenCalled();
 						expect( ctx.store.getState() ).toEqual({});
 
-						liveStore.close();
+						liveStore.endStream();
 
 						ctx.dispose();
 					} );
@@ -309,15 +332,14 @@ describe( 'EagleEyeContext', () => {
 							}
 						);
 
-						liveStore.close();
+						liveStore.endStream();
 
 						ctx.dispose();
 					} );
 					test( 'completes `store.resetState` method call if `resetState` prehook returns TRUTHY', () => {
-						const prehooks = Object.freeze({
+						const ctx = new EagleEyeContextClass( undefined, {
 							resetState: jest.fn().mockReturnValue( true )
-						});
-						const ctx = new EagleEyeContextClass();
+						} );
 						expect( connectSetSpy ).not.toHaveBeenCalled();
 						
 						// applies to externally generated updates
@@ -336,15 +358,14 @@ describe( 'EagleEyeContext', () => {
 						expect( connectSetSpy ).toHaveBeenCalled();
 						expect( ctx.store.getState() ).toEqual({});
 
-						liveStore.close();
+						liveStore.endStream();
 
 						ctx.dispose();
 					} );
 					test( 'aborts `store.resetState` method call if `resetState` prehook returns FALSY', () => {
-						const prehooks = Object.freeze({
+						const ctx = new EagleEyeContextClass( undefined, {
 							resetState: jest.fn().mockReturnValue( false )
-						});
-						const ctx = new EagleEyeContextClass( undefined, prehooks );
+						} );
 						expect( connectSetSpy ).not.toHaveBeenCalled();
 						
 						// applies to externally generated updates
@@ -367,7 +388,7 @@ describe( 'EagleEyeContext', () => {
 							any: 'thing', from: 'stream'
 						});
 
-						liveStore.close();
+						liveStore.endStream();
 
 						ctx.dispose();
 					} );
@@ -392,7 +413,7 @@ describe( 'EagleEyeContext', () => {
 							any: 'thing', from: 'stream'
 						});
 
-						liveStore.close();
+						liveStore.endStream();
 
 						ctx.dispose();
 					} );
@@ -417,15 +438,14 @@ describe( 'EagleEyeContext', () => {
 						expect( prehooks.setState ).toHaveBeenCalledTimes( 1 );
 						expect( prehooks.setState ).toHaveBeenCalledWith({ from: 'stream' });
 
-						liveStore.close();
+						liveStore.endStream();
 
 						ctx.dispose();
 					} );
 					test( 'completes `store.setState` method call if `setState` prehook returns TRUTHY', () => {
-						const prehooks = Object.freeze({
+						const ctx = new EagleEyeContextClass( undefined, {
 							setState: jest.fn().mockReturnValue( true )
 						});
-						const ctx = new EagleEyeContextClass();
 						expect( connectSetSpy ).not.toHaveBeenCalled();
 						
 						// applies to externally generated updates
@@ -442,15 +462,14 @@ describe( 'EagleEyeContext', () => {
 							any: 'thing', from: 'stream'
 						});
 
-						liveStore.close();
+						liveStore.endStream();
 
 						ctx.dispose();
 					} );
 					test( 'aborts `store.setState` method call if `setState` prehook returns FALSY', () => {
-						const prehooks = Object.freeze({
+						const ctx = new EagleEyeContextClass( undefined, {
 							setState: jest.fn().mockReturnValue( false )
-						});
-						const ctx = new EagleEyeContextClass( undefined, prehooks );
+						} );
 						expect( connectSetSpy ).not.toHaveBeenCalled();
 						
 						// applies to externally generated updates
@@ -465,7 +484,7 @@ describe( 'EagleEyeContext', () => {
 						expect( connectSetSpy ).not.toHaveBeenCalled();
 						expect( ctx.store.getState() ).toEqual({});
 
-						liveStore.close();
+						liveStore.endStream();
 
 						ctx.dispose();
 					} );
@@ -504,6 +523,15 @@ describe( 'EagleEyeContext', () => {
 					setState: expect.any( Function ),
 					subscribe: expect.any( Function ),
 				}) );
+			} );
+			test( 'in isolation, maintains communication with the context', () => {
+				const ctx = new EagleEyeContextClass({});
+				const store = ctx.store;
+				const mockCloseListener = jest.fn();
+				store.subscribe( 'closing', mockCloseListener );
+				ctx.dispose();
+				expect( mockCloseListener ).toHaveBeenCalled();
+				store.close();
 			} );
 			describe( 'external store reference', () => {
 				type IStoreData = {
@@ -684,8 +712,8 @@ describe( 'EagleEyeContext', () => {
 						2: '555',
 						3: '5000'
 					});
-					liveStore1.close();
-					liveStore2.close();
+					liveStore1.endStream();
+					liveStore2.endStream();
 					ctx.dispose();
 				} );
 				test( 'can reset state and propagate to all streaming components', () => {
@@ -734,8 +762,8 @@ describe( 'EagleEyeContext', () => {
 						2: '552',
 						3: '2282'
 					});
-					liveStore1.close();
-					liveStore2.close();
+					liveStore1.endStream();
+					liveStore2.endStream();
 					ctx.dispose();
 				});
 				test( 'subscribes to context exit', () => {
@@ -763,7 +791,7 @@ describe( 'EagleEyeContext', () => {
 				test( 'subscribes to state changes', () => {
 					const changes = { price: 45 };
 					const onChangeMock = jest.fn();
-					const unsub = ctx.store.subscribe( 'dataUpdate', onChangeMock );
+					const unsub = ctx.store.subscribe( 'data-updated', onChangeMock );
 					expect( onChangeMock ).not.toHaveBeenCalled();
 					ctx.store.setState( changes );
 					expect( onChangeMock ).toHaveBeenCalled();
@@ -813,7 +841,7 @@ describe( 'EagleEyeContext', () => {
 				test( 'observes all state changes coming into the context', async () => {
 					const ctx = new EagleEyeContextClass<Partial<SourceData>>( createSourceData() );
 					const onChangeMock = jest.fn()
-					const unsub = ctx.store.subscribe( 'dataUpdate', onChangeMock );
+					const unsub = ctx.store.subscribe( 'data-updated', onChangeMock );
 					
 					const NEW_CNAME = 'What is my company name again?????';
 					const liveStore = ctx.stream();
@@ -848,6 +876,11 @@ describe( 'EagleEyeContext', () => {
 						company: 'Geez! Did you get the name I sent ya?????'
 					});
 					expect( onChangeMock ).not.toHaveBeenCalled();
+
+					liveStore.endStream();
+					liveStore2.endStream();
+
+					ctx.dispose();
 				} );
 			} );
 		} );
@@ -858,9 +891,49 @@ describe( 'EagleEyeContext', () => {
 			test( "invocation returns an observable LiveStore 'an automatically updating store'", () => {
 				expect( context.stream() ).toBeInstanceOf( LiveStore );
 			} );
+			test( 'in isolation, maintains communication with the context', () => {
+				const ctx = new EagleEyeContextClass({});
+				expect( ctx.store.getState() ).toEqual({});
+				ctx.store.setState({ b: 22 });
+				const useStream = ctx.stream;
+				const liveStore_0 = useStream({
+					anchor: 'a'
+				});
+				const liveStore_1 = useStream({
+					myRes : 'b',
+					testVal: 'a'
+				});
+				expect( ctx.store.getState() ).toEqual({
+					b: 22
+				});
+				expect( liveStore_0.data ).toEqual({
+					anchor: undefined
+				});
+				expect( liveStore_1.data ).toEqual({
+					myRes : 22,
+					testVal: undefined
+				});
+				ctx.store.setState({ a: 1024 });
+				expect( ctx.store.getState() ).toEqual({
+					a: 1024,
+					b: 22
+				});
+				expect( liveStore_0.data ).toEqual({
+					anchor: 1024
+				});
+				expect( liveStore_1.data ).toEqual({
+					myRes : 22,
+					testVal: 1024
+				});
+				
+				liveStore_0.endStream();
+				liveStore_1.endStream();
+
+				ctx.dispose();
+			} );
 			describe( "change stream's LiveStore", () => {
 				let data : Partial<SourceData>;
-				let ctx : EagleEyeContextClass<Partial<SourceData>>;
+				let ctx0 : EagleEyeContextClass<Partial<SourceData>>;
 				const selectorMapOnRender = {
 					year3: 'history.places[2].year',
 					isActive: 'isActive',
@@ -868,11 +941,11 @@ describe( 'EagleEyeContext', () => {
 				};
 				beforeAll(() => {
 					data = createSourceData();
-					ctx = createEagleEye({ value: data });
+					ctx0 = createEagleEye({ value: data });
 				});
-				afterAll(() => { ctx.dispose() });
+				afterAll(() => { ctx0.dispose() });
 				test( 'returns a store with labeled state slices', () => {
-					const store = ctx.stream({
+					const store = ctx0.stream({
 						all: FULL_STATE_SELECTOR,
 						tags: 'tags'
 					});
@@ -884,10 +957,10 @@ describe( 'EagleEyeContext', () => {
 						resetState: expect.any( Function ),
 						setState: expect.any( Function )
 					});
-					store.close();
+					store.endStream();
 				} );
 				describe( 'events', () => {
-					describe( 'closing', () => {
+					describe( 'stream-ending', () => {
 						let ctx : EagleEyeContextClass<Partial<SourceData>>;
 						beforeEach(() => {
 							ctx = new EagleEyeContextClass<Partial<SourceData>>( createSourceData() );
@@ -896,16 +969,16 @@ describe( 'EagleEyeContext', () => {
 						test( 'invoked at the end of live store streaming phase', () => {
 							const store = ctx.stream();
 							const closeHandler = jest.fn();
-							store.addListener( 'closing', closeHandler );
+							store.addListener( 'stream-ending', closeHandler );
 							expect( closeHandler ).not.toHaveBeenCalled();
-							store.close();
+							store.endStream();
 							expect( closeHandler ).toHaveBeenCalled();
 						} );
 						test( 'invoked with a user level message at normal closure', () => {
 							const store = ctx.stream();
 							const closeHandler = jest.fn();
-							store.addListener( 'closing', closeHandler );
-							store.close();
+							store.addListener( 'stream-ending', closeHandler );
+							store.endStream();
 							expect( closeHandler ).toHaveBeenCalledWith( ShutdownReason.LOCAL );
 						} );
 						test( 'is invoked with a cache level message when closing due to downstream cache closure', () => {
@@ -913,7 +986,7 @@ describe( 'EagleEyeContext', () => {
 							const ctx = new EagleEyeContextClass( cache );
 							const store = ctx.stream();
 							const closeHandler = jest.fn();
-							store.addListener( 'closing', closeHandler );
+							store.addListener( 'stream-ending', closeHandler );
 							expect( store.streaming ).toBe( true );
 							ctx.cache.close();
 							expect( store.streaming ).toBe( false );
@@ -925,14 +998,14 @@ describe( 'EagleEyeContext', () => {
 							const ctx = new EagleEyeContextClass( cache );
 							const store = ctx.stream();
 							const closeHandler = jest.fn();
-							store.addListener( 'closing', closeHandler );
+							store.addListener( 'stream-ending', closeHandler );
 							expect( store.streaming ).toBe( true );
 							ctx.dispose();
 							expect( store.streaming ).toBe( false );
 							expect( closeHandler ).toHaveBeenCalledWith( ShutdownReason.CONTEXT );
 						} );
 					} );
-					describe( 'dataChange', () => {
+					describe( 'data-changed', () => {
 						let ctx : EagleEyeContextClass<Partial<SourceData>>;
 						beforeEach(() => {
 							ctx = new EagleEyeContextClass<Partial<SourceData>>( createSourceData() );
@@ -949,7 +1022,7 @@ describe( 'EagleEyeContext', () => {
 								lineDigits: '2282'
 							});
 							const changeHandler = jest.fn();
-							store.addListener( 'dataChange', changeHandler );
+							store.addListener( 'data-changed', changeHandler );
 							expect( changeHandler ).not.toHaveBeenCalled();
 							store.setState({ isActive: true }); // change to global ctx did not affect stream
 							expect( store.data ).toEqual({
@@ -972,7 +1045,7 @@ describe( 'EagleEyeContext', () => {
 							});
 							expect( changeHandler ).toHaveBeenCalledTimes( 1 );
 							changeHandler.mockClear();
-							store.close();
+							store.endStream();
 						} );
 					} );
 				} );
@@ -1029,7 +1102,7 @@ describe( 'EagleEyeContext', () => {
 								tag7: undefined,
 								tags: [ 0, 1, 2, 4, 6 ].map( i => defaultState.tags[ i ] )
 							});
-							store.close();
+							store.endStream();
 						} );
 						test( 'holds the complete current state object whenever `@@STATE` entry appears in the selectorMap', () => {
 							const store = ctx.stream({
@@ -1074,7 +1147,7 @@ describe( 'EagleEyeContext', () => {
 								isActive: true,
 								state: updatedDataEquiv
 							});
-							store.close();
+							store.endStream();
 						} );
 						test( 'holds an empty object when no renderKeys provided ', async () => {
 							const store = ctx.stream();
@@ -1091,7 +1164,7 @@ describe( 'EagleEyeContext', () => {
 								} as SourceData["history"]
 							});
 							expect( store.data ).toEqual({});
-							store.close();
+							store.endStream();
 						} );
 						test( 'does not update for resubmitted changes', async () => {
 							const ctx = new EagleEyeContextClass<Partial<SourceData>>( createSourceData() );
@@ -1164,7 +1237,7 @@ describe( 'EagleEyeContext', () => {
 									...selectorMapOnRender,
 									company: 'company'
 								};
-								const store = ctx.stream( origSelectorMap );
+								const store = ctx0.stream( origSelectorMap );
 								store.selectorMap = _selectorMapOnRender as unknown as OrigSelectorMap;
 								expect( Object.keys( store.data ) )
 									.toEqual( Object.keys( _selectorMapOnRender ));
@@ -1189,7 +1262,7 @@ describe( 'EagleEyeContext', () => {
 								const mockSubscribe = jest.fn()
 									.mockReturnValue( mockUnsubscribe );
 
-								const store = ctx.stream( selectorMapOnRender );
+								const store = ctx0.stream( selectorMapOnRender );
 
 								expect( connectSpy ).toHaveBeenCalledTimes( 3 );
 								expect( mockSubscribe ).toHaveBeenCalledTimes( 1 );
@@ -1202,10 +1275,13 @@ describe( 'EagleEyeContext', () => {
 								expect( mockSubscribe ).toHaveBeenCalledTimes( 2 );
 								expect( disconnectSpy ).toHaveBeenCalledTimes( 1 );
 								expect( mockUnsubscribe ).toHaveBeenCalledTimes( 1 );
-								
+
+								disconnectSpy.mockRestore();
+								getSpy.mockRestore();
+								connectSpy.mockRestore();
 								cacheSpy.mockRestore();
 
-								store.close();
+								store.endStream();
 							});
 							describe( 'when the new selectorMap is not empty', () => {
 								test( 'refreshes state data', () => {
@@ -1222,7 +1298,7 @@ describe( 'EagleEyeContext', () => {
 										.mockReturnValue( cache );
 									expect( getSpy ).not.toHaveBeenCalled();
 
-									const store = ctx.stream( selectorMapOnRender );
+									const store = ctx0.stream( selectorMapOnRender );
 
 									expect( getSpy ).toHaveBeenCalledTimes( 2 );
 									expect( getSpy.mock.calls[ 1 ] ).toEqual(
@@ -1237,9 +1313,11 @@ describe( 'EagleEyeContext', () => {
 										...Object.values( selectorMapOnRerender )
 									);
 
+									getSpy.mockRestore();
+									connectSpy.mockRestore();
 									cacheSpy.mockRestore();
 
-									store.close();
+									store.endStream();
 								});
 								test( 'sets up new subscription with the consumer', () => {
 									const mockSubscribe = jest.fn()
@@ -1255,13 +1333,8 @@ describe( 'EagleEyeContext', () => {
 											mockUnsubscribe();
 										}
 									}
-									interface TestBaseStream extends BaseStream<SourceData> {
-										<S extends SelectorMap>(selectorMap : S) : TestLiveStore<S>;
-									}
 									class TestEagleEyeContextClass extends EagleEyeContextClass<SourceData> {
-										protected initStream() {
-											this._stream = selectorMap => new TestLiveStore( this, selectorMap );
-										}
+										protected _stream : BaseStream<SourceData> = selectorMap => new TestLiveStore( this, selectorMap );
 									}
 
 									const ctx = new TestEagleEyeContextClass( sourceData );
@@ -1276,7 +1349,7 @@ describe( 'EagleEyeContext', () => {
 									expect( mockSubscribe ).toHaveBeenCalledTimes( 2 );
 									expect( mockUnsubscribe ).toHaveBeenCalledTimes( 1 );
 
-									store.close();
+									store.endStream();
 									
 									ctx.dispose();
 								});
@@ -1284,7 +1357,7 @@ describe( 'EagleEyeContext', () => {
 						} );
 						describe( 'accepting an array of propertyPaths in place of a selector map', () => {
 							test( 'produces an indexed-based context state data object', () => {
-								const store = ctx.stream([
+								const store = ctx0.stream([
 									...Object.values( selectorMapOnRender ),
 									FULL_STATE_SELECTOR
 								]);
@@ -1300,7 +1373,7 @@ describe( 'EagleEyeContext', () => {
 						describe( 'when the new selectorMap is empty', () => {
 							describe( 'and existing data is not empty', () => {
 								test( 'adjusts the store on selctorMap change', () => {
-									const store = ctx.stream( selectorMapOnRender );
+									const store = ctx0.stream( selectorMapOnRender );
 									expect( Object.keys( store.data ) )
 										.toEqual( Object.keys( selectorMapOnRender ));
 									store.selectorMap = {} as unknown as typeof selectorMapOnRender
@@ -1342,7 +1415,7 @@ describe( 'EagleEyeContext', () => {
 									cacheSpy.mockRestore();
 									streamSpy.mockRestore();
 
-									store.close();
+									store.endStream();
 
 									ctx.dispose();
 								} );
@@ -1383,7 +1456,7 @@ describe( 'EagleEyeContext', () => {
 									cacheSpy.mockRestore();
 									streamSpy.mockRestore();
 
-									store.close();
+									store.endStream();
 
 									ctx.dispose();
 								} );
@@ -1405,9 +1478,7 @@ describe( 'EagleEyeContext', () => {
 										<S extends SelectorMap>(selectorMap : S) : TestLiveStore<S>;
 									}
 									class TestEagleEyeContextClass extends EagleEyeContextClass<SourceData> {
-										protected initStream() {
-											this._stream = selectorMap => new TestLiveStore( this, selectorMap );
-										}
+										protected _stream : TestBaseStream = selectorMap => new TestLiveStore( this, selectorMap );
 									}
 
 									const ctx = new TestEagleEyeContextClass( sourceData );
@@ -1423,7 +1494,7 @@ describe( 'EagleEyeContext', () => {
 									expect( mockSubscribe ).not.toHaveBeenCalled();
 									expect( mockUnsubscribe ).toHaveBeenCalledTimes( 1 );
 
-									store.close();
+									store.endStream();
 
 									ctx.dispose();
 								} );
@@ -1431,7 +1502,7 @@ describe( 'EagleEyeContext', () => {
 							describe( 'and existing data is empty', () => {
 								test( 'leaves the store as-is on selctorMap change', () => {
 									let _origData : typeof mockGetReturnValue = {};
-									const store = ctx.stream();
+									const store = ctx0.stream();
 									expect( Object.keys( store.data ) ).toBe( 0 );
 									_origData = store.data as typeof mockGetReturnValue;
 									store.selectorMap = undefined;
@@ -1442,7 +1513,7 @@ describe( 'EagleEyeContext', () => {
 									expect( store.data ).toBe( _origData );
 									store.selectorMap = [];
 									expect( store.data ).toBe( _origData );
-									store.close();
+									store.endStream();
 								} );
 								test( 'performs no state data update', async () => {
 									const cache = new AutoImmutable( createSourceData() );
@@ -1480,7 +1551,7 @@ describe( 'EagleEyeContext', () => {
 									cacheSpy.mockRestore();
 									streamSpy.mockRestore();
 
-									store.close();
+									store.endStream();
 
 									ctx.dispose();
 								} );
@@ -1502,9 +1573,7 @@ describe( 'EagleEyeContext', () => {
 										<S extends SelectorMap>(selectorMap : S) : TestLiveStore<S>;
 									}
 									class TestEagleEyeContextClass extends EagleEyeContextClass<SourceData> {
-										protected initStream() {
-											this._stream = selectorMap => new TestLiveStore( this, selectorMap );
-										}
+										protected _stream : TestBaseStream = selectorMap => new TestLiveStore( this, selectorMap );
 									}
 
 									const ctx = new TestEagleEyeContextClass( sourceData );
@@ -1519,7 +1588,7 @@ describe( 'EagleEyeContext', () => {
 									expect( mockSubscribe ).not.toHaveBeenCalled();
 									expect( mockUnsubscribe ).not.toHaveBeenCalled();
 
-									store.close();
+									store.endStream();
 
 									ctx.dispose();
 								} );
@@ -1542,9 +1611,7 @@ describe( 'EagleEyeContext', () => {
 											<S extends SelectorMap>(selectorMap : S) : TestLiveStore<S>;
 										}
 										class TestEagleEyeContextClass extends EagleEyeContextClass<SourceData> {
-											protected initStream() {
-												this._stream = selectorMap => new TestLiveStore( this, selectorMap );
-											}
+											protected _stream : TestBaseStream = selectorMap => new TestLiveStore( this, selectorMap );
 										}
 
 										const cache = new AutoImmutable( createSourceData() );
@@ -1560,7 +1627,7 @@ describe( 'EagleEyeContext', () => {
 										const ctx = new TestEagleEyeContextClass( cache );
 
 										const store = ctx.stream( selectorMapOnRender );
-
+										
 										expect( connectSpy ).toHaveBeenCalledTimes( 3 );
 										expect( mockSubscribe ).not.toHaveBeenCalled();
 										expect( disconnectSpy ).not.toHaveBeenCalled();
@@ -1578,7 +1645,7 @@ describe( 'EagleEyeContext', () => {
 										disconnectSpy.mockRestore();
 										getSpy.mockRestore();
 
-										store.close();
+										store.endStream();
 
 										ctx.dispose();
 									} );
@@ -1588,9 +1655,9 @@ describe( 'EagleEyeContext', () => {
 					} );
 					describe( 'LiveStore.streaming', () => {
 						test( 'is flag set for a live store versus a closed store', () => {
-							const store = ctx.stream();
+							const store = ctx0.stream();
 							expect( store.streaming ).toBe( true );
-							store.close();
+							store.endStream();
 							expect( store.streaming ).toBe( false );
 						} );
 					} );
@@ -1605,8 +1672,8 @@ describe( 'EagleEyeContext', () => {
 						const store = ctx.stream();
 						const mockChangeListener = jest.fn();
 						const mockCloseListener = jest.fn();
-						store.addListener( 'dataChange', mockCloseListener );
-						store.addListener( 'closing', mockChangeListener );
+						store.addListener( 'data-changed', mockChangeListener );
+						store.addListener( 'stream-ending', mockCloseListener );
 						store.setState({ age: 55 });
 						expect( mockChangeListener ).toHaveBeenCalled();
 						expect( mockCloseListener ).not.toHaveBeenCalled();
@@ -1615,7 +1682,7 @@ describe( 'EagleEyeContext', () => {
 						expect( mockChangeListener ).toHaveBeenCalled();
 						expect( mockCloseListener ).not.toHaveBeenCalled();
 						mockChangeListener.mockClear();
-						store.close();
+						store.endStream();
 						expect( mockChangeListener ).not.toHaveBeenCalled();
 						expect( mockCloseListener ).toHaveBeenCalled();
 					} );
@@ -1625,10 +1692,10 @@ describe( 'EagleEyeContext', () => {
 							// @ts-expect-error
 							store.addListener( 'someEvent', () => {} );
 						} ).toThrow();
-						store.close();
+						store.endStream();
 					} )
 				} );
-				describe( 'LiveStore.close', () => {
+				describe( 'LiveStore.endStream', () => {
 					let ctx : EagleEyeContextClass<Partial<SourceData>>;
 					beforeEach(() => {
 						ctx = new EagleEyeContextClass<Partial<SourceData>>( createSourceData() );
@@ -1648,7 +1715,7 @@ describe( 'EagleEyeContext', () => {
 						};
 						const dataChangeHandler = jest.fn();
 						const store = ctx.stream( selectorMap );
-						store.addListener( 'dataChange', dataChangeHandler );
+						store.addListener( 'data-changed', dataChangeHandler );
 						expect( store.data ).toEqual({ reghHour: 9 });
 						setSpy.mockClear();
 						getSpy.mockClear();
@@ -1665,7 +1732,7 @@ describe( 'EagleEyeContext', () => {
 						expect( dataChangeHandler ).toHaveBeenCalled();
 						expect( setSpy ).toHaveBeenCalled();
 						expect( getSpy ).toHaveBeenCalled();
-						expect( store.data ).toEqual({ reghHour: 22 });
+						expect( store.data ).toEqual({ regHour: 22 });
 						dataChangeHandler.mockClear();
 						setSpy.mockClear();
 						getSpy.mockClear();
@@ -1682,38 +1749,38 @@ describe( 'EagleEyeContext', () => {
 						expect( dataChangeHandler ).not.toHaveBeenCalled();
 						expect( setSpy ).not.toHaveBeenCalled();
 						expect( getSpy ).not.toHaveBeenCalled();
-						expect( store.data ).toEqual({ reghHour: 22 }); // instead of 16
+						expect( store.data ).toEqual({ regHour: 22 }); // instead of 16
 						
 						setSpy.mockRestore();
 						getSpy.mockRestore();
 						connectSpy.mockRestore();
 
-						ctx.dispose();
+						store.endStream();
 
 					} );
 				} );			
 				describe( 'LiveStore.removeListener', () => {
 					let ctx : EagleEyeContextClass<Partial<SourceData>>;
 					beforeEach(() => {
-						ctx = new EagleEyeContextClass<Partial<SourceData>>( createSourceData() );
+						ctx = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
 					});
 					afterEach(() =>  { ctx.dispose() });
 					test( 'allows for added listeners to be removed for store data change and store closing events', () => {
 						const store = ctx.stream();
 						const mockChangeListener = jest.fn();
 						const mockCloseListener = jest.fn();
-						store.addListener( 'dataChange', mockCloseListener );
-						store.addListener( 'closing', mockChangeListener );
+						store.addListener( 'stream-ending', mockCloseListener );
+						store.addListener( 'data-changed', mockChangeListener );
 						store.setState({ age: 55 });
 						expect( mockChangeListener ).toHaveBeenCalled();
 						expect( mockCloseListener ).not.toHaveBeenCalled();
 						mockChangeListener.mockClear();
-						store.removeListener( 'dataChange', mockCloseListener );
-						store.removeListener( 'closing', mockChangeListener );
+						store.removeListener( 'stream-ending', mockCloseListener );
+						store.removeListener( 'data-changed', mockChangeListener );
 						store.setState({ name: { first: 'Janet' } });
 						expect( mockChangeListener ).not.toHaveBeenCalled();
 						expect( mockCloseListener ).not.toHaveBeenCalled();
-						store.close();
+						store.endStream();
 						expect( mockChangeListener ).not.toHaveBeenCalled();
 						expect( mockCloseListener ).not.toHaveBeenCalled();
 					} );
@@ -1723,7 +1790,7 @@ describe( 'EagleEyeContext', () => {
 							// @ts-expect-error
 							store.removeListener( 'someEvent', () => {} );
 						} ).toThrow();
-						store.close();
+						store.endStream();
 					} )
 				} );
 				describe( 'LiveStore.resetState', () => {
@@ -1753,7 +1820,8 @@ describe( 'EagleEyeContext', () => {
 								connectSpy.mockRestore();
 								setSpy.mockRestore();
 
-								store.close();
+								store.endStream();
+
 								ctx.dispose();
 							} );
 						} );
@@ -1793,7 +1861,7 @@ describe( 'EagleEyeContext', () => {
 								connectSpy.mockRestore();
 								setSpy.mockRestore();
 
-								store.close();
+								store.endStream();
 
 								ctx.dispose();
 							} );
@@ -1823,7 +1891,7 @@ describe( 'EagleEyeContext', () => {
 								connectSpy.mockRestore();
 								setSpy.mockRestore();
 
-								store.close();
+								store.endStream();
 
 								ctx.dispose();
 							} );
@@ -1847,7 +1915,7 @@ describe( 'EagleEyeContext', () => {
 								connectSpy.mockRestore();
 								setSpy.mockRestore();
 
-								store.close();
+								store.endStream();
 
 								ctx.dispose();
 							} );
@@ -1855,17 +1923,13 @@ describe( 'EagleEyeContext', () => {
 					} );
 				} );
 				describe( 'LiveStore.setState', () => {
-					let ctx : EagleEyeContextClass<Partial<SourceData>>;
-					beforeEach(() => {
-						ctx = new EagleEyeContextClass<Partial<SourceData>>( createSourceData() );
-					});
-					afterEach(() =>  { ctx.dispose() });
-					// @debug
-					test( '1xxxx', () => {
-					// test( 'commits any updates to the context', () => {
+					test( 'commits any updates to the context', () => {
+						const immutable = new AutoImmutable( createSourceData() as Partial<SourceData> );
+						const ctx = new EagleEyeContextClass( immutable );
 						const store = ctx.stream();
 						const defaultState = createSourceData();
 						expect( store.data ).toEqual({}); // no selectormap under observation
+						
 						expect( ctx.store.getState() ).toEqual( defaultState );
 						store.setState({
 							friends: { [ MOVE_TAG ]: [ -1, 1 ] } as unknown as Array<any>,
@@ -1887,14 +1951,12 @@ describe( 'EagleEyeContext', () => {
 						expectedValue.isActive = true;
 						expectedValue.tags = [ 0, 1, 2, 4, 6 ].map( i => defaultState.tags[ i ] );
 
-
-						// @debug
-						console.info( '>>>>>>>>>>>>>>>>> ', JSON.stringify( ctx.store.getState(), null, 2 ) );
-
-
 						expect( ctx.store.getState() ).toEqual( expectedValue );
 						expect( store.data ).toEqual({}); // no selectormap under observation
-						store.close();
+						
+						store.endStream();
+
+						ctx.dispose();
 					} );
 				} );
 			} );

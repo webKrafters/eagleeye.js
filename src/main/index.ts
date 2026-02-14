@@ -56,12 +56,20 @@ class Event<
 	LISTENER_PARAMS extends Array<unknown> = Array<unknown>
 > {	
 	private listeners = new Set<LISTENER>();
+
 	emit( ...args : LISTENER_PARAMS ) {
 		this.listeners.forEach( listener => listener( ...args ) );
 	}
 	addListener( listener : LISTENER ) { this.listeners.add( listener ) }
 	removeListener( listener : LISTENER ) { this.listeners.delete( listener ) }
 }
+
+export const enum Phase {
+	UN_OPENED = -1,
+	CLOSED = 0,
+	OPENED = 1,
+	CLOSING = 2
+};
 
 export class LiveStore<
 	T extends State = State,
@@ -71,10 +79,11 @@ export class LiveStore<
 	private _ctxStoreRef : StoreRef<T> = null;
 	private _data = {} as Data<S, T>;
 	private eventMap = {
-		closing: new Event<ShutdownMonitor, [ShutdownReason]>(),
-		dataChange: new Event()
+		'data-changed': new Event(),
+		'stream-ending': new Event<ShutdownMonitor, [ShutdownReason]>()
 	};
 	private _fullStateSelectorIndex = -1;
+	private _phase = Phase.UN_OPENED;
 	private _selectorMap : S = null;
 	private _selectorMapInverse = {};
 	private _renderKeys : Array<string> = [];
@@ -84,7 +93,10 @@ export class LiveStore<
 	constructor( context : EagleEyeContext<T>, selectorMap? : S ) {
 		this._context = context;
 		this._setupStoreRef();
-		if( isEmpty( selectorMap ) ) { return }
+		if( isEmpty( selectorMap ) ) {
+			this._phase = Phase.OPENED;
+			return;
+		}
 		this.subscribe();
 		this._selectorMap = selectorMap;
 		this._renderKeys = Object.values( selectorMap as {} );
@@ -101,16 +113,22 @@ export class LiveStore<
 			];
 		}
 		this._refreshDataRef();
+		this._phase = Phase.OPENED;
 	}
 	
 	get data() { return this._data }
 
-	get streaming() { return !!this._context }
+	get streaming() {
+		return this._phase === Phase.OPENED || this._phase === Phase.UN_OPENED
+	}
 	
 	@streamable
 	set selectorMap( selectorMap : S ) {
 		selectorMap = selectorMap ?? null;
-		if( selectorMap === this.selectorMap || isEqual( selectorMap, this.selectorMap ) ) { return }
+		if( selectorMap === this.selectorMap
+			|| isEqual( selectorMap, this.selectorMap )
+			|| this._phase === Phase.UN_OPENED
+		) { return }
 		this._updateStoreRef();
 		this._selectorMapInverse = {};
 		if( isEmpty( selectorMap ) ) {
@@ -131,22 +149,23 @@ export class LiveStore<
 		}
 	}
 
-	addListener( eventType : 'closing', listener : ShutdownMonitor ) : void;
-	addListener( eventType : 'dataChange', listener : ()=>void ) : void;
+	addListener( eventType : 'stream-ending', listener : ShutdownMonitor ) : void;
+	addListener( eventType : 'data-changed', listener : ()=>void ) : void;
 	@streamable
 	addListener( eventType, listener ) : void {
 		this.eventMap[ eventType ].addListener( listener );
 	}
 
 	@streamable
-	close() {
-		this.eventMap.closing.emit( ShutdownReason.LOCAL );
+	endStream() {
+		this.eventMap[ 'stream-ending' ].emit( ShutdownReason.LOCAL );
+		this._phase = Phase.CLOSING;
 		this._ctxStoreRef.close();
 		this._reclaim();
 	}
 
-	removeListener( eventType : 'closing', listener : ShutdownMonitor ) : void;
-	removeListener( eventType : 'dataChange', listener : ()=>void ) : void;
+	removeListener( eventType : 'stream-ending', listener : ShutdownMonitor ) : void;
+	removeListener( eventType : 'data-changed', listener : ()=>void ) : void;
 	@streamable
 	removeListener( eventType, listener ) : void {
 		this.eventMap[ eventType ].removeListener( listener );
@@ -159,16 +178,12 @@ export class LiveStore<
 
 	@streamable
 	setState( changes : Changes<T> ) {
-
-		// @debug
-		console.info( 'CHANGES in livestore >>>>> ', JSON.stringify( changes, null, 2 ) );
-
 		this._ctxStoreRef.setState( changes );
 	}
 
 	@streamable
 	protected subscribe() {
-		this._unsubscribe ||= this._ctxStoreRef.subscribe( 'dataUpdate', this._dataSourceListener );
+		this._unsubscribe ||= this._ctxStoreRef.subscribe( 'data-updated', this._dataSourceListener );
 	}
 
 	@streamable
@@ -191,6 +206,7 @@ export class LiveStore<
 
 	private _reclaim() {
 		this.unsubscribe();
+		this._unsubClosing()
 		this._context = null;
 		this._ctxStoreRef = null;
 		this.eventMap = null;
@@ -198,6 +214,7 @@ export class LiveStore<
 		this._renderKeys = null;
 		this._unsubClosing = null;
 		this._unsubscribe = null;
+		this._phase = Phase.CLOSED;
 	}
 	
 	private _refineKeys = () => {
@@ -210,15 +227,16 @@ export class LiveStore<
 
 	private _refreshDataRef() {
 		this._data = { ...this._data };
-		this.eventMap.dataChange.emit();
+		this.eventMap[ 'data-changed' ].emit();
 	}
 
 	private _setupStoreRef() {
 		this._ctxStoreRef = this._context.createStoreRef( ACCESS_SYM );
 		this._unsubClosing = this._ctxStoreRef.subscribe( 'closing', r => {
-			this.eventMap.closing.emit( r );
+			this.eventMap[ 'stream-ending' ].emit( r );
+			this._phase = Phase.CLOSING;
 			this._reclaim();
-		});
+		} );
 	}
 
 	private _updateData = () => {
@@ -241,7 +259,7 @@ export class LiveStore<
 
 	private _updateStoreRef() {
 		this.unsubscribe();
-		this._unsubClosing?.();
+		this._unsubClosing();
 		this._ctxStoreRef.close();
 		this._setupStoreRef();
 	}
@@ -255,7 +273,7 @@ export class EagleEyeContext<T extends State = State>{
 	private _store : StoreRef<T>;
 	private eventMap = {
 		closing: new Event<ShutdownMonitor, [ShutdownReason]>(),
-		dataUpdate: new Event<Listener, [
+		'data-updated': new Event<Listener, [
 			changes : Changes<T>,
 			changePathsTokens : Array<Array<string>>,
 			netChanges : Readonly<Partial<T>>,
@@ -266,7 +284,7 @@ export class EagleEyeContext<T extends State = State>{
 	private isCacheLocal = true;
 	private storageKey : string = null;
 
-	protected _stream : BaseStream<T>;
+	protected _stream : BaseStream<T> = selectorMap => new LiveStore( this, selectorMap );
 
 	constructor(
 		value? : AutoImmutable<T>,
@@ -289,18 +307,14 @@ export class EagleEyeContext<T extends State = State>{
 		} else {
 			this._cache = value;
 			const tConnection = this._cache.connect();
-			this.inchoateValue = tConnection.get( constants.FULL_STATE_SELECTOR )[ constants.FULL_STATE_SELECTOR ];
+			this.inchoateValue = tConnection.get()[ constants.GLOBAL_SELECTOR ];
 			tConnection.disconnect();
 			this.isCacheLocal = false;
-			this._cache.onClose(() => {
-				this.notifyClosing( ShutdownReason.CACHE );
-				this._reclaim()
-			});
+			this._cache.onClose( this._cacheCloseHandler );
 		}
 		this.prehooks = prehooks;
 		this.storage = storage;
 		this._store = this._createStoreRef();
-		this.initStream();
 	}
 
 	get cache() { return this._cache }
@@ -366,18 +380,13 @@ export class EagleEyeContext<T extends State = State>{
 	}
 
 	@invokable
-	dispose() {
-		this.notifyClosing( ShutdownReason.CONTEXT );
-		this._store.close();
-		this.isCacheLocal && this._cache.close();
-		this._reclaim();
-	}
+	dispose() { this._dispose( ShutdownReason.CONTEXT ) }
 
 	protected createUpdateEmitterFor( changes : Changes<T> ) {
 		return (
 			netChanges : Readonly<Partial<T>>,
 			changedPathsTokens : Array<Array<string>>
-		) => this.eventMap.dataUpdate.emit(
+		) => this.eventMap[ 'data-updated' ].emit(
 			changes,
 			changedPathsTokens,
 			netChanges,
@@ -395,11 +404,6 @@ export class EagleEyeContext<T extends State = State>{
 	) {
 		return getState( connection, propertyPaths );
 	}
-	
-	@invokable
-	protected initStream() {
-		this._stream = selectorMap => new LiveStore( this, selectorMap );
-	}
 
 	@invokable
 	protected notifyClosing( reason : ShutdownReason ) {
@@ -411,7 +415,13 @@ export class EagleEyeContext<T extends State = State>{
 		connection : Connection<T>,
 		propertyPaths : Array<string> = []
 	) {
-		const { CLEAR_TAG, DELETE_TAG, FULL_STATE_SELECTOR, GLOBAL_SELECTOR, REPLACE_TAG } = constants
+		const {
+			CLEAR_TAG,
+			DELETE_TAG,
+			FULL_STATE_SELECTOR,
+			GLOBAL_SELECTOR,
+			REPLACE_TAG
+		} = constants;
 		const original = this.storage.clone( this.storage.getItem( this.storageKey ) );
 		let resetData;
 		if( !propertyPaths.length ) {
@@ -449,7 +459,7 @@ export class EagleEyeContext<T extends State = State>{
 		}
 		runPrehook( this._prehooks, 'resetState', [
 			resetData, {
-				current: connection.get( GLOBAL_SELECTOR )[ GLOBAL_SELECTOR ],
+				current: connection.get()[ GLOBAL_SELECTOR ],
 				original
 			}
 		] ) && connection.set( resetData, this.createUpdateEmitterFor( resetData ) );
@@ -469,18 +479,11 @@ export class EagleEyeContext<T extends State = State>{
 				changes[ c ] = transformPayload( changes[ c ] );
 			}
 		}
-
-		
-
-		// @debug
-		console.info( 'CHANGES in post transformation >>>>> ', JSON.stringify( changes, null, 2 ) );
-
-
 		connection.set( changes, this.createUpdateEmitterFor( changes ) );
 	}
 
 	protected subscribe( eventType : 'closing', listener : ShutdownMonitor ) : Unsubscribe;
-	protected subscribe( eventType : 'dataUpdate', listener : Listener ) : Unsubscribe;
+	protected subscribe( eventType : 'data-updated', listener : Listener ) : Unsubscribe;
 	@invokable
 	protected subscribe( eventType, listener ) : Unsubscribe {
 		const event = this.eventMap[ eventType ];
@@ -488,21 +491,33 @@ export class EagleEyeContext<T extends State = State>{
 		return () => event.removeListener( listener );
 	}
 
+	private _cacheCloseHandler = () => !this.closed && this._dispose( ShutdownReason.CACHE );
+
 	private _createStoreRef() : StoreRef<T> {
-		return (() => {
-			let connection = this._cache.connect();
-			return {
-				close: () => {
-					this.disconnectStoreRef( connection );
-					connection = null;
-				},
-				get closed() { return !connection },
-				getState: ( propertyPaths = [] ) => this.getState( connection, propertyPaths ) as T,
-				resetState: ( propertyPaths = [] ) => this.resetState( connection, propertyPaths ),
-				setState: changes => this.setState( connection, changes ),
-				subscribe: this.subscribe.bind( this )
-			};
-		})();
+		const ctx = this;
+		let connection = ctx._cache.connect();
+		return {
+			close: () => {
+				ctx.disconnectStoreRef( connection );
+				connection = null;
+			},
+			get closed() { return !connection },
+			getState: ( propertyPaths = [] ) => ctx.getState( connection, propertyPaths ) as T,
+			resetState: ( propertyPaths = [] ) => ctx.resetState( connection, propertyPaths ),
+			setState: changes => ctx.setState( connection, changes ),
+			subscribe: ( eventType, listener ) => {
+				return ctx.subscribe( eventType, listener );
+			}
+		};
+	}
+
+	private _dispose( reason : ShutdownReason ) {
+		this.notifyClosing( reason );
+		this._store.close();
+		!this.isCacheLocal
+			? this._cache.offClose( this._cacheCloseHandler )
+			: this._cache.close();
+		this._reclaim();
 	}
 
 	private _reclaim() {
@@ -557,12 +572,17 @@ function getState<T extends State>(
 	connection : Connection<T>,
 	propertyPaths : Array<string> = []
 ) : Readonly<Partial<T>> {
-	if( !propertyPaths.length || propertyPaths.indexOf( constants.FULL_STATE_SELECTOR ) !== -1 ) {
-		return connection.get( constants.GLOBAL_SELECTOR )[ constants.GLOBAL_SELECTOR ];
-	}
+	const { FULL_STATE_SELECTOR, GLOBAL_SELECTOR } = constants;
+	if( !propertyPaths.length ) { return connection.get()[ GLOBAL_SELECTOR ] }
+	const gIndex = propertyPaths.indexOf( FULL_STATE_SELECTOR );
+	if( gIndex !== -1 ) { propertyPaths[ gIndex ] = GLOBAL_SELECTOR }
 	const data = connection.get( ...propertyPaths );
 	const state : Partial<T> = {};
 	for( const d in data ) { set( state, d, data[ d ] ) }
+	if( gIndex !== -1 ) {
+		state[ FULL_STATE_SELECTOR as unknown as number ] = state[ GLOBAL_SELECTOR ];
+		delete state[ GLOBAL_SELECTOR ]
+	}
 	return mkReadonly( state );
 }
 

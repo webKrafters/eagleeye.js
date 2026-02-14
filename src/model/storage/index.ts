@@ -22,7 +22,7 @@ class SessionStorage<T extends State> implements IStorage<T> {
 
 class Storage<T extends State> implements IStorage<T> {
 	private _storage : IStorage<T>;
-	static supportsSession = typeof globalThis.sessionStorage?.setItem === 'undefined';
+	static supportsSession = typeof globalThis.sessionStorage?.setItem !== 'undefined';
 	constructor() {
 		this._storage = Storage.supportsSession
 			? new SessionStorage()

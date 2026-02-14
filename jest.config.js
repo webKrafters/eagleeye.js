@@ -18,10 +18,6 @@ module.exports = {
 	setupFiles: [
 		'<rootDir>/setupTests.js'
 	],
-	testEnvironment: 'jsdom',
-	testEnvironmentOptions: {
-		url: 'http://localhost/'
-	},
 	transform: {
 		'\\.[jt]sx?$': 'ts-jest'
 	}

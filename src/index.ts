@@ -98,7 +98,9 @@ export type Data<
     SELECTOR_MAP extends SelectorMap,
     STATE extends State = State
 > = (
-    SELECTOR_MAP extends ObjectSelector
+    SELECTOR_MAP extends void
+    ? {}
+    : SELECTOR_MAP extends ObjectSelector
     ? {[ S_KEY in keyof SELECTOR_MAP ] : DataPoint<SELECTOR_MAP[S_KEY], STATE> }
     : SELECTOR_MAP extends ArraySelector
     ? {[ S_NUM : number ] : DataPoint<SELECTOR_MAP[number], STATE>}
@@ -170,7 +172,7 @@ export interface StoreRef<T extends State = State> extends IStore<T>{
     getState : (propertyPaths?: Array<string>) => T;
     subscribe : {
         (eventType: "closing", listener: ShutdownMonitor) : Unsubscribe;
-        (eventType: "dataUpdate", listener: Listener) : Unsubscribe;
+        (eventType: "data-updated", listener: Listener) : Unsubscribe;
     }
 }
 
