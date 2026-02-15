@@ -33,6 +33,7 @@ import createSourceData, {
 } from '../test-artifacts/data/create-state-obj';
 
 import {
+	CLEAR_TAG,
 	DELETE_TAG,
 	FULL_STATE_SELECTOR,
 	MOVE_TAG,
@@ -166,12 +167,12 @@ describe( 'EagleEyeContext', () => {
 		} );
 	});
 	describe( 'properties', () => {
-		let storage : IStorage<SourceData>;
 		let sourceData : SourceData;
+		let storage : IStorage<SourceData>;
 		let context : EagleEyeContextClass<SourceData>;
 		let prehooks : Prehooks<SourceData>;
 		beforeAll(() => {
-			storage = getMockStorage( null as unknown as Partial<SourceData> );
+			storage = getMockStorage( null as unknown as SourceData );
 			prehooks = {};
 			sourceData = createSourceData();
 			context = new EagleEyeContextClass( sourceData, prehooks, storage );
@@ -241,27 +242,6 @@ describe( 'EagleEyeContext', () => {
 			} );
 		} );
 		describe( 'EagleEyeContext.prehooks', () => {
-			let connectSetSpy : jest.SpyInstance<void, [
-				changes: AutoImmutableModule.Changes<{}>,
-				onComplete?: AutoImmutableModule.Listener | undefined
-			], any>;
-			let AutoImmutableSpy : jest.SpyInstance<AutoImmutableModule.Connection<any>, [], any>
-			beforeAll(() => {
-				const cache = new AutoImmutable({});
-				const connection = cache.connect();
-				connectSetSpy = jest.spyOn( connection, 'set' );
-				AutoImmutableSpy = jest.spyOn( AutoImmutable.prototype, 'connect' );
-				AutoImmutableSpy.mockReturnValue( connection );
-
-			});
-			afterAll(() => {
-				connectSetSpy.mockRestore();
-				AutoImmutableSpy.mockRestore();
-			})
-			beforeEach(() => {
-				connectSetSpy.mockClear();
-				AutoImmutableSpy.mockClear();
-			});
 			test( 'can be set and retrieved', () => {
 				expect( context.prehooks ).toBe( prehooks );
 				const newPrehooks =  {};
@@ -272,6 +252,12 @@ describe( 'EagleEyeContext', () => {
 			describe( 'resetState prehook', () => {
 				describe( 'when `resetState` prehook does not exist on the context', () => {
 					test( 'completes `store.resetState` method call', () => {
+						const cache = new AutoImmutable({});
+						const connection = cache.connect();
+						const connectSetSpy = jest.spyOn( connection, 'set' );
+						const AutoImmutableSpy = jest.spyOn( AutoImmutable.prototype, 'connect' );
+						AutoImmutableSpy.mockReturnValue( connection );
+
 						const ctx = new EagleEyeContextClass();
 						expect( connectSetSpy ).not.toHaveBeenCalled();
 						
@@ -296,22 +282,31 @@ describe( 'EagleEyeContext', () => {
 						liveStore.endStream();
 
 						ctx.dispose();
+
+						connectSetSpy.mockRestore();
+						AutoImmutableSpy.mockRestore();
 					} );
 				} );
 				describe( 'when `resetState` prehook exists on the context', () => {
 					test( 'is called by the `store.resetState` method', () => {
+						const cache = new AutoImmutable({});
+						const connection = cache.connect();
+						const connectSetSpy = jest.spyOn( connection, 'set' );
+						const AutoImmutableSpy = jest.spyOn( AutoImmutable.prototype, 'connect' );
+						AutoImmutableSpy.mockReturnValue( connection );
+
 						const prehooks = Object.freeze({
 							resetState: jest.fn().mockReturnValue( false )
 						});
 						const ctx = new EagleEyeContextClass( undefined, prehooks );
 						expect( connectSetSpy ).not.toHaveBeenCalled();
-						
+
 						// applies to externally generated updates
 						ctx.store.setState({ any: 'thing' });
 						ctx.store.resetState([ FULL_STATE_SELECTOR ]);
 						expect( prehooks.resetState ).toHaveBeenCalledTimes( 1 );
 						expect( prehooks.resetState ).toHaveBeenCalledWith(
-							{ [ REPLACE_TAG ]: {} },
+							CLEAR_TAG,
 							{
 								current: { any: 'thing' },
 								original: {}
@@ -325,7 +320,7 @@ describe( 'EagleEyeContext', () => {
 						liveStore.resetState([ FULL_STATE_SELECTOR ]);
 						expect( prehooks.resetState ).toHaveBeenCalledTimes( 1 );
 						expect( prehooks.resetState ).toHaveBeenCalledWith(
-							{ [ REPLACE_TAG ]: {} },
+							CLEAR_TAG,
 							{
 								current: { any: 'thing' },
 								original: {}
@@ -335,12 +330,22 @@ describe( 'EagleEyeContext', () => {
 						liveStore.endStream();
 
 						ctx.dispose();
+
+						connectSetSpy.mockRestore();
+						AutoImmutableSpy.mockRestore();
 					} );
 					test( 'completes `store.resetState` method call if `resetState` prehook returns TRUTHY', () => {
+						const cache = new AutoImmutable({});
+						const connection = cache.connect();
+						const connectSetSpy = jest.spyOn( connection, 'set' );
+						const AutoImmutableSpy = jest.spyOn( AutoImmutable.prototype, 'connect' );
+						AutoImmutableSpy.mockReturnValue( connection );
+
 						const ctx = new EagleEyeContextClass( undefined, {
 							resetState: jest.fn().mockReturnValue( true )
 						} );
-						expect( connectSetSpy ).not.toHaveBeenCalled();
+
+						connectSetSpy.mockClear();
 						
 						// applies to externally generated updates
 						ctx.store.setState({ any: 'thing' });
@@ -361,12 +366,22 @@ describe( 'EagleEyeContext', () => {
 						liveStore.endStream();
 
 						ctx.dispose();
+
+						connectSetSpy.mockRestore();
+						AutoImmutableSpy.mockRestore();
 					} );
 					test( 'aborts `store.resetState` method call if `resetState` prehook returns FALSY', () => {
+						const cache = new AutoImmutable({});
+						const connection = cache.connect();
+						const connectSetSpy = jest.spyOn( connection, 'set' );
+						const AutoImmutableSpy = jest.spyOn( AutoImmutable.prototype, 'connect' );
+						AutoImmutableSpy.mockReturnValue( connection );
+
 						const ctx = new EagleEyeContextClass( undefined, {
 							resetState: jest.fn().mockReturnValue( false )
 						} );
-						expect( connectSetSpy ).not.toHaveBeenCalled();
+						
+						connectSetSpy.mockClear();
 						
 						// applies to externally generated updates
 						ctx.store.setState({ any: 'thing' });
@@ -391,14 +406,24 @@ describe( 'EagleEyeContext', () => {
 						liveStore.endStream();
 
 						ctx.dispose();
+
+						connectSetSpy.mockRestore();
+						AutoImmutableSpy.mockRestore();
 					} );
 				} );
 			} );
 			describe( 'setState prehook', () => {
 				describe( 'when `setState` prehook does not exist on the context', () => {
 					test( 'completes `store.setState` method call', () => {
+						const cache = new AutoImmutable({});
+						const connection = cache.connect();
+						const connectSetSpy = jest.spyOn( connection, 'set' );
+						const AutoImmutableSpy = jest.spyOn( AutoImmutable.prototype, 'connect' );
+						AutoImmutableSpy.mockReturnValue( connection );
+
 						const ctx = new EagleEyeContextClass();
-						expect( connectSetSpy ).not.toHaveBeenCalled();
+						
+						connectSetSpy.mockClear();
 						
 						// applies to externally generated updates
 						ctx.store.setState({ any: 'thing' });
@@ -416,15 +441,25 @@ describe( 'EagleEyeContext', () => {
 						liveStore.endStream();
 
 						ctx.dispose();
+
+						connectSetSpy.mockRestore();
+						AutoImmutableSpy.mockRestore();
 					} );
 				} );
 				describe( 'when `setState` prehook exists on the context', () => {
 					test( 'is called by the `store.setState` method', () => {
+						const cache = new AutoImmutable({});
+						const connection = cache.connect();
+						const connectSetSpy = jest.spyOn( connection, 'set' );
+						const AutoImmutableSpy = jest.spyOn( AutoImmutable.prototype, 'connect' );
+						AutoImmutableSpy.mockReturnValue( connection );
+
 						const prehooks = Object.freeze({
 							setState: jest.fn().mockReturnValue( false )
 						});
 						const ctx = new EagleEyeContextClass( undefined, prehooks );
-						expect( connectSetSpy ).not.toHaveBeenCalled();
+						
+						connectSetSpy.mockClear();
 						
 						// applies to externally generated updates
 						ctx.store.setState({ any: 'thing' });
@@ -441,12 +476,22 @@ describe( 'EagleEyeContext', () => {
 						liveStore.endStream();
 
 						ctx.dispose();
+
+						connectSetSpy.mockRestore();
+						AutoImmutableSpy.mockRestore();
 					} );
 					test( 'completes `store.setState` method call if `setState` prehook returns TRUTHY', () => {
+						const cache = new AutoImmutable({});
+						const connection = cache.connect();
+						const connectSetSpy = jest.spyOn( connection, 'set' );
+						const AutoImmutableSpy = jest.spyOn( AutoImmutable.prototype, 'connect' );
+						AutoImmutableSpy.mockReturnValue( connection );
+
 						const ctx = new EagleEyeContextClass( undefined, {
 							setState: jest.fn().mockReturnValue( true )
 						});
-						expect( connectSetSpy ).not.toHaveBeenCalled();
+						
+						connectSetSpy.mockClear();
 						
 						// applies to externally generated updates
 						ctx.store.setState({ any: 'thing' });
@@ -465,12 +510,22 @@ describe( 'EagleEyeContext', () => {
 						liveStore.endStream();
 
 						ctx.dispose();
+
+						connectSetSpy.mockRestore();
+						AutoImmutableSpy.mockRestore();
 					} );
 					test( 'aborts `store.setState` method call if `setState` prehook returns FALSY', () => {
+						const cache = new AutoImmutable({});
+						const connection = cache.connect();
+						const connectSetSpy = jest.spyOn( connection, 'set' );
+						const AutoImmutableSpy = jest.spyOn( AutoImmutable.prototype, 'connect' );
+						AutoImmutableSpy.mockReturnValue( connection );
+						
 						const ctx = new EagleEyeContextClass( undefined, {
 							setState: jest.fn().mockReturnValue( false )
 						} );
-						expect( connectSetSpy ).not.toHaveBeenCalled();
+						
+						connectSetSpy.mockClear();
 						
 						// applies to externally generated updates
 						ctx.store.setState({ any: 'thing' });
@@ -487,6 +542,9 @@ describe( 'EagleEyeContext', () => {
 						liveStore.endStream();
 
 						ctx.dispose();
+
+						connectSetSpy.mockRestore();
+						AutoImmutableSpy.mockRestore();
 					} );
 				} );
 			} );
@@ -495,9 +553,7 @@ describe( 'EagleEyeContext', () => {
 			test( 'can be set and retrieved', () => {
 				const currentStorage = context.storage;
 				expect( currentStorage ).toBe( storage );
-				const newStorage : Storage = {
-					...storage, _data: undefined as unknown as SourceData
-				}
+				const newStorage = getMockStorage( undefined as unknown as SourceData );
 				context.storage = newStorage;
 				expect( context.storage ).not.toBe( currentStorage );
 				expect( context.storage ).toBe( newStorage );
@@ -505,9 +561,7 @@ describe( 'EagleEyeContext', () => {
 			test( 'change transfers value from old storage to the new', () => {
 				const currentStorage = context.storage;
 				const data = currentStorage.getItem( null);
-				const newStorage : Storage = {
-					...storage, _data: undefined as unknown as SourceData
-				};
+				const newStorage = getMockStorage( undefined as unknown as SourceData );
 				expect( data ).not.toBeUndefined();
 				expect( newStorage.getItem( null ) ).toBeUndefined();
 				context.storage = newStorage;

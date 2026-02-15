@@ -268,6 +268,7 @@ export class LiveStore<
 export class EagleEyeContext<T extends State = State>{
 
 	private _cache : AutoImmutable<T>;
+	private _cacheCloseMonitor : () => void;
 	private _prehooks : Prehooks<T>;
 	private _storage : IStorage<T>;
 	private _store : StoreRef<T>;
@@ -282,7 +283,6 @@ export class EagleEyeContext<T extends State = State>{
 	};
 	private inchoateValue : T;
 	private storageKey : string = null;
-	private unsubCacheClosing : () => void = null;
 
 	protected _stream : BaseStream<T> = selectorMap => new LiveStore( this, selectorMap );
 
@@ -309,13 +309,14 @@ export class EagleEyeContext<T extends State = State>{
 			const tConnection = this._cache.connect();
 			this.inchoateValue = tConnection.get()[ constants.GLOBAL_SELECTOR ];
 			tConnection.disconnect();
-			this.unsubCacheClosing = this._cache.onClose(() => {
+			this._cacheCloseMonitor = () => {
 				/* if( this.closed ) { return } && */
 				
 				this.notifyClosing( ShutdownReason.CACHE );
 				this._store.close();
 				this._reclaim();
-			});
+			}
+			this._cache.onClose( this._cacheCloseMonitor );
 		}
 		this.prehooks = prehooks;
 		this.storage = storage;
@@ -387,8 +388,8 @@ export class EagleEyeContext<T extends State = State>{
 	@invokable
 	dispose() {
 		this.notifyClosing( ShutdownReason.CONTEXT );
-		this.unsubCacheClosing
-			? this.unsubCacheClosing()
+		this._cacheCloseMonitor
+			? this._cache.offClose( this._cacheCloseMonitor )
 			: this._cache.close()
 		this._store.close();
 		this._reclaim();
@@ -530,7 +531,7 @@ export class EagleEyeContext<T extends State = State>{
 		this.inchoateValue = null;
 		this.storageKey = null;
 		this._stream = null;
-		this.unsubCacheClosing = null;
+		this._cacheCloseMonitor = null;
 	}
 }
 
