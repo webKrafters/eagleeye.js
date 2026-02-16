@@ -2,7 +2,7 @@ import clonedeep from '@webkrafters/clone-total';
 
 import type { IStorage, State } from '../..';
 
-class MemoryStorage<T extends State> implements IStorage<T> {
+export class MemoryStorage<T extends State> implements IStorage<T> {
 	private _data : T;
 	constructor() { this._data = null }
 	clone( data : T ) : T { return clonedeep( data ) }

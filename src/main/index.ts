@@ -32,6 +32,7 @@ import isEqual from 'lodash.isequal';
 import isPlainObject from 'lodash.isplainobject';
 import set from 'lodash.set';
 
+import get from '@webkrafters/get-property';
 import mapPathsToObject from '@webkrafters/data-distillery';
 import stringToDotPath from '@webkrafters/path-dotize';
 import AutoImmutable from '@webkrafters/auto-immutable';
@@ -48,6 +49,8 @@ const createStorageKey = () => `${ ++iCount }:${ Date.now() }:${ Math.random() }
 export const deps = { createStorageKey };
 
 const defaultPrehooks : Readonly<Prehooks<State>> = Object.freeze({});
+
+const { FULL_STATE_SELECTOR } = constants;
 
 export const ACCESS_SYM = Symbol( 'KNOWN_ENTITY_ID' );
 
@@ -82,11 +85,8 @@ export class LiveStore<
 		'data-changed': new Event(),
 		'stream-ending': new Event<ShutdownMonitor, [ShutdownReason]>()
 	};
-	private _fullStateSelectorIndex = -1;
 	private _phase = Phase.UN_OPENED;
 	private _selectorMap : S = null;
-	private _selectorMapInverse = {};
-	private _renderKeys : Array<string> = [];
 	private _unsubClosing : Unsubscribe = null;
 	private _unsubscribe : Unsubscribe = null;
 
@@ -98,20 +98,7 @@ export class LiveStore<
 			return;
 		}
 		this.subscribe();
-		this._selectorMap = selectorMap;
-		this._renderKeys = Object.values( selectorMap as {} );
-		this._fullStateSelectorIndex = this._renderKeys.indexOf( constants.FULL_STATE_SELECTOR );
-		for( const selectorKey in this._selectorMap ) {
-			this._selectorMapInverse[ this._selectorMap[ selectorKey as string ] ] = selectorKey;
-		}
-		const state = this._ctxStoreRef.getState( this._refineKeys() );
-		for( const propertyPath of this._renderKeys ) {
-			this._data[ this._selectorMapInverse[ propertyPath ] ] = state[
-				propertyPath === constants.FULL_STATE_SELECTOR
-					? constants.GLOBAL_SELECTOR
-					: propertyPath
-			];
-		}
+		this._integrateSelectors( selectorMap );
 		this._refreshDataRef();
 		this._phase = Phase.OPENED;
 	}
@@ -130,27 +117,19 @@ export class LiveStore<
 			|| this._phase === Phase.UN_OPENED
 		) { return }
 		this._updateStoreRef();
-		this._selectorMapInverse = {};
 		if( isEmpty( selectorMap ) ) {
 			this._selectorMap = null;
-			this._renderKeys = [];
-			this._fullStateSelectorIndex = -1;
 			this._data = {} as typeof this._data;
 			this._refreshDataRef();
 		} else {
-			this._selectorMap = selectorMap;
-			this._renderKeys = Object.values( selectorMap as {} );
-			this._fullStateSelectorIndex = this._renderKeys.indexOf( constants.FULL_STATE_SELECTOR );
-			for( const selectorKey in this._selectorMap ) {
-				this._selectorMapInverse[ this._selectorMap[ selectorKey as string ] ] = selectorKey;
-			}
+			this._integrateSelectors( selectorMap );
 			this.subscribe();
 			this._updateData();
 		}
 	}
 
 	addListener( eventType : 'stream-ending', listener : ShutdownMonitor ) : void;
-	addListener( eventType : 'data-changed', listener : ()=>void ) : void;
+	addListener( eventType : 'data-changed', listener : () => void ) : void;
 	@streamable
 	addListener( eventType, listener ) : void {
 		this.eventMap[ eventType ].addListener( listener );
@@ -172,7 +151,7 @@ export class LiveStore<
 	}
 	
 	@streamable
-	resetState( propertyPaths = this._renderKeys as Array<string> ) {
+	resetState( propertyPaths = this._renderKeys ) {
 		this._ctxStoreRef.resetState( propertyPaths );
 	}
 
@@ -193,16 +172,30 @@ export class LiveStore<
 		this._unsubscribe = null;
 	}
 
+	private get _renderKeys() {
+		return Object.values( this._selectorMap as {} ) as Array<string>;
+	}
+
 	private _dataSourceListener : Listener = (
 		changes, changePathsTokens, netChanges, mayHaveChangesAt
 	) => {
-		for( let _Len = this._renderKeys.length, _ = 0; _ < _Len; _++ ) {
-			if( this._renderKeys[ _ ] !== constants.FULL_STATE_SELECTOR && !mayHaveChangesAt(
-				stringToDotPath( this._renderKeys[ _ ] as string ).split( '.' )
+		for( let renderKeys = this._renderKeys, rLen = renderKeys.length, r = 0; r < rLen; r++ ) {
+			if( renderKeys[ r ] !== FULL_STATE_SELECTOR && !mayHaveChangesAt(
+				stringToDotPath( renderKeys[ r ] as string ).split( '.' )
 			) ) { continue }
 			return this._updateData();
 		}
 	};
+
+	private _integrateSelectors( selectorMap : S ) {
+		this._selectorMap = selectorMap;
+		const state = this._ctxStoreRef.getState( this._renderKeys );
+		for( const k in selectorMap ) {
+			this._data[ k as string ] = selectorMap[ k ] !== FULL_STATE_SELECTOR
+				? get( state, selectorMap[ k ] as string ).value
+				: state;
+		}
+	}
 
 	private _reclaim() {
 		this.unsubscribe();
@@ -210,19 +203,9 @@ export class LiveStore<
 		this._context = null;
 		this._ctxStoreRef = null;
 		this.eventMap = null;
-		this._selectorMapInverse = null;
-		this._renderKeys = null;
 		this._unsubClosing = null;
 		this._unsubscribe = null;
 		this._phase = Phase.CLOSED;
-	}
-	
-	private _refineKeys = () => {
-		const rKeys = this._renderKeys.slice();
-		if( this._fullStateSelectorIndex !== -1 ) {
-			rKeys[ this._fullStateSelectorIndex ] = constants.GLOBAL_SELECTOR;
-		}
-		return rKeys;
 	}
 
 	private _refreshDataRef() {
@@ -241,18 +224,29 @@ export class LiveStore<
 
 	private _updateData = () => {
 		let hasChanges = false;
-		const state = this._ctxStoreRef.getState( this._refineKeys() );
-		for( const propertyPath of this._renderKeys ) {
-			const selectorKey = this._selectorMapInverse[ propertyPath ];
-			if( propertyPath === constants.FULL_STATE_SELECTOR ) {
-				if( this._data[ selectorKey ] === state[ constants.GLOBAL_SELECTOR ] ) { continue }
-				this._data[ selectorKey ] = state[ constants.GLOBAL_SELECTOR ];
+		const selectorEntries = Object.entries( this._selectorMap as {} );
+		const state = this._ctxStoreRef.getState( this._renderKeys );
+		for( const [ label, path ] of selectorEntries ) {
+			if( path !== FULL_STATE_SELECTOR ) {
+				const slice = get( state, path as string )._value;
+				if( this._data[ label ] === slice ) { continue }
+				this._data[ label ] = slice;
 				hasChanges = true;
 				continue;
 			}
-			if( this._data[ selectorKey ] === state[ propertyPath ] ) { continue }
-			this._data[ selectorKey ] = state[ propertyPath ];
-			hasChanges = true;
+			const keys = Object.keys( this._data[ label ] ?? {} );
+			if( keys.length !== Object.keys( state ).length ) {
+				this._data[ label ] = state;
+				hasChanges = true;
+				continue;
+			}
+			for( let i = keys.length, data = this._data[ label ]; i--; ) {
+				if( data[ keys[ i ] ] !== state[ keys[ i ] ] ) {
+					this._data[ label ] = state;
+					hasChanges = true;
+					break;
+				}
+			}
 		}
 		hasChanges && this._refreshDataRef();
 	}
@@ -310,8 +304,6 @@ export class EagleEyeContext<T extends State = State>{
 			this.inchoateValue = tConnection.get()[ constants.GLOBAL_SELECTOR ];
 			tConnection.disconnect();
 			this._cacheCloseMonitor = () => {
-				/* if( this.closed ) { return } && */
-				
 				this.notifyClosing( ShutdownReason.CACHE );
 				this._store.close();
 				this._reclaim();
@@ -575,16 +567,12 @@ function getState<T extends State>(
 	propertyPaths : Array<string> = []
 ) : Readonly<Partial<T>> {
 	const { FULL_STATE_SELECTOR, GLOBAL_SELECTOR } = constants;
-	if( !propertyPaths.length ) { return connection.get()[ GLOBAL_SELECTOR ] }
-	const gIndex = propertyPaths.indexOf( FULL_STATE_SELECTOR );
-	if( gIndex !== -1 ) { propertyPaths[ gIndex ] = GLOBAL_SELECTOR }
+	if( !propertyPaths.length || propertyPaths.indexOf( FULL_STATE_SELECTOR ) !== -1  ) {
+		return connection.get()[ GLOBAL_SELECTOR ]
+	}
 	const data = connection.get( ...propertyPaths );
 	const state : Partial<T> = {};
 	for( const d in data ) { set( state, d, data[ d ] ) }
-	if( gIndex !== -1 ) {
-		state[ FULL_STATE_SELECTOR as unknown as number ] = state[ GLOBAL_SELECTOR ];
-		delete state[ GLOBAL_SELECTOR ]
-	}
 	return mkReadonly( state );
 }
 

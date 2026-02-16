@@ -1,4 +1,7 @@
-import { AccessorResponse, Immutable } from '@webkrafters/auto-immutable';
+import {
+	AccessorResponse,
+	Immutable
+} from '@webkrafters/auto-immutable';
 
 import {
 	ShutdownReason,
@@ -7,6 +10,7 @@ import {
 	type Prehooks,
 	type SelectorMap,
 	type State,
+	// @debug
 	type Store,
 	type StoreRef,
 	type Stream
@@ -17,6 +21,8 @@ import getProperty from '@webkrafters/get-property';
 import * as AutoImmutableModule from '@webkrafters/auto-immutable';
 
 import clonedeep from '@webkrafters/clone-total';
+
+import { MemoryStorage as TestStorage } from '../model/storage';
 
 import {
 	ACCESS_SYM,
@@ -43,14 +49,13 @@ import {
 const { default: AutoImmutable } = AutoImmutableModule;
 
 function getMockStorage<T extends State>( data : Partial<T> ) {
+	const _storage =  new TestStorage<T>();
 	return {
-		clone: jest.fn().mockReturnValue( clonedeep( data ) ),
-		getItem: jest.fn().mockReturnValue( data ),
-		removeItem: jest.fn().mockImplementation( k => {
-			data = null as unknown as typeof data;
-		}),
-		setItem: jest.fn().mockImplementation(( k, v ) => { data = v })
-	} as IStorage<T>
+		clone: jest.fn().mockImplementation( d => _storage.clone( d ) ),
+		getItem: jest.fn().mockImplementation( k => _storage.getItem( k ) ),
+		removeItem: jest.fn().mockImplementation( k => _storage.removeItem( k ) ),
+		setItem: jest.fn().mockImplementation(( k, v ) => _storage.setItem( k, v ) );
+	} as IStorage<T>;
 }
 
 describe( 'EagleEyeContext', () => {
@@ -177,6 +182,7 @@ describe( 'EagleEyeContext', () => {
 			sourceData = createSourceData();
 			context = new EagleEyeContextClass( sourceData, prehooks, storage );
 		});
+		afterAll(() => context.dispose() )
 		describe( 'EagleEyeContext.cache', () => {
 			test( 'can be retrieved', () => {
 				expect( context.cache ).toBeInstanceOf( Immutable );
@@ -559,14 +565,23 @@ describe( 'EagleEyeContext', () => {
 				expect( context.storage ).toBe( newStorage );
 			} );
 			test( 'change transfers value from old storage to the new', () => {
+				const sourceData = createSourceData();
+				const context = new EagleEyeContextClass(
+					createSourceData(),
+					{},
+					getMockStorage( null as unknown as SourceData )
+				);
+				
 				const currentStorage = context.storage;
-				const data = currentStorage.getItem( null);
+				const data = currentStorage.getItem( null );
 				const newStorage = getMockStorage( undefined as unknown as SourceData );
-				expect( data ).not.toBeUndefined();
-				expect( newStorage.getItem( null ) ).toBeUndefined();
+				expect( data ).toStrictEqual( sourceData );
+				expect( newStorage.getItem( null ) ).toBeNull();
 				context.storage = newStorage;
-				expect( currentStorage.getItem( null ) ).toBeUndefined();
+				expect( currentStorage.getItem( null ) ).toBeNull();
 				expect( newStorage.getItem( null ) ).toBe( data );
+				
+				context.dispose();
 			} );
 		} );
 		describe( 'EagleEyeContext.store', () => {
@@ -945,8 +960,11 @@ describe( 'EagleEyeContext', () => {
 			test( "invocation returns an observable LiveStore 'an automatically updating store'", () => {
 				expect( context.stream() ).toBeInstanceOf( LiveStore );
 			} );
-			test( 'in isolation, maintains communication with the context', () => {
+			// @debug
+			test( '1xxxx', () => {
+			// test( 'in isolation, maintains communication with the context', () => {
 				const ctx = new EagleEyeContextClass({});
+
 				expect( ctx.store.getState() ).toEqual({});
 				ctx.store.setState({ b: 22 });
 				const useStream = ctx.stream;
@@ -968,6 +986,13 @@ describe( 'EagleEyeContext', () => {
 					testVal: undefined
 				});
 				ctx.store.setState({ a: 1024 });
+
+				// @debug
+				console.info( ' >>>>>>>>>> ', JSON.stringify(
+					// ctx.store.getState()
+					ctx.cache, null, 2
+				) );
+
 				expect( ctx.store.getState() ).toEqual({
 					a: 1024,
 					b: 22
