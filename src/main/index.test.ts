@@ -960,9 +960,7 @@ describe( 'EagleEyeContext', () => {
 			test( "invocation returns an observable LiveStore 'an automatically updating store'", () => {
 				expect( context.stream() ).toBeInstanceOf( LiveStore );
 			} );
-			// @debug
-			test( '1xxxx', () => {
-			// test( 'in isolation, maintains communication with the context', () => {
+			test( 'in isolation, maintains communication with the context', () => {
 				const ctx = new EagleEyeContextClass({});
 
 				expect( ctx.store.getState() ).toEqual({});
@@ -975,6 +973,7 @@ describe( 'EagleEyeContext', () => {
 					myRes : 'b',
 					testVal: 'a'
 				});
+
 				expect( ctx.store.getState() ).toEqual({
 					b: 22
 				});
@@ -986,12 +985,6 @@ describe( 'EagleEyeContext', () => {
 					testVal: undefined
 				});
 				ctx.store.setState({ a: 1024 });
-
-				// @debug
-				console.info( ' >>>>>>>>>> ', JSON.stringify(
-					// ctx.store.getState()
-					ctx.cache, null, 2
-				) );
 
 				expect( ctx.store.getState() ).toEqual({
 					a: 1024,
@@ -1028,14 +1021,12 @@ describe( 'EagleEyeContext', () => {
 						all: FULL_STATE_SELECTOR,
 						tags: 'tags'
 					});
-					expect( store ).toEqual({
-						data: {
-							all: sourceData,
-							tags: sourceData.tags
-						},
-						resetState: expect.any( Function ),
-						setState: expect.any( Function )
-					});
+					expect( store ).toBeInstanceOf( LiveStore );
+					expect( store.data ).toEqual({
+						all: sourceData,
+						tags: sourceData.tags
+					}),
+					expect( store.streaming ).toBe( true );
 					store.endStream();
 				} );
 				describe( 'events', () => {
@@ -1119,8 +1110,8 @@ describe( 'EagleEyeContext', () => {
 							// affects stream by altering its observed selector map
 							store.selectorMap = [ 'company', 'phone.line' ] as unknown as typeof selectorMap; 
 							expect( store.data ).toEqual({
-								1: 'VORTEXACO',
-								2: '2300'
+								0: 'VORTEXACO',
+								1: '2300'
 							});
 							expect( changeHandler ).toHaveBeenCalledTimes( 1 );
 							changeHandler.mockClear();
@@ -1332,35 +1323,31 @@ describe( 'EagleEyeContext', () => {
 									.spyOn( connection, 'get' )
 									.mockReturnValue( mockGetReturnValue );
 								const connectSpy = jest
-									.spyOn( cache, 'connect' )
-									.mockReturnValue( connection )
-								const cacheSpy = jest
-									.spyOn( AutoImmutableModule, 'default' )
-									.mockReturnValue( cache );
-								const mockUnsubscribe = jest.fn();
-								const mockSubscribe = jest.fn()
-									.mockReturnValue( mockUnsubscribe );
+									.spyOn( AutoImmutable.prototype, 'connect' )
+									.mockReturnValue( connection );
 
-								const store = ctx0.stream( selectorMapOnRender );
+								const ctx = new EagleEyeContextClass( cache );
 
-								expect( connectSpy ).toHaveBeenCalledTimes( 3 );
-								expect( mockSubscribe ).toHaveBeenCalledTimes( 1 );
+								connectSpy.mockClear();
+								disconnectSpy.mockClear();
+
+								const store = ctx.stream( selectorMapOnRender );
+
+								expect( connectSpy ).toHaveBeenCalledTimes( 1 );
 								expect( disconnectSpy ).not.toHaveBeenCalled();
-								expect( mockUnsubscribe ).not.toHaveBeenCalled();
 
 								store.selectorMap = selectorMapOnRerender as unknown as typeof selectorMapOnRender;
 								
-								expect( connectSpy ).toHaveBeenCalledTimes( 4 );
-								expect( mockSubscribe ).toHaveBeenCalledTimes( 2 );
+								expect( connectSpy ).toHaveBeenCalledTimes( 2 );
 								expect( disconnectSpy ).toHaveBeenCalledTimes( 1 );
-								expect( mockUnsubscribe ).toHaveBeenCalledTimes( 1 );
 
 								disconnectSpy.mockRestore();
 								getSpy.mockRestore();
 								connectSpy.mockRestore();
-								cacheSpy.mockRestore();
 
 								store.endStream();
+
+								ctx.dispose();
 							});
 							describe( 'when the new selectorMap is not empty', () => {
 								test( 'refreshes state data', () => {
@@ -1370,18 +1357,18 @@ describe( 'EagleEyeContext', () => {
 										.spyOn( connection, 'get' )
 										.mockReturnValue( mockGetReturnValue );
 									const connectSpy = jest
-										.spyOn( cache, 'connect' )
-										.mockReturnValue( connection )
-									const cacheSpy = jest
-										.spyOn( AutoImmutableModule, 'default' )
-										.mockReturnValue( cache );
-									expect( getSpy ).not.toHaveBeenCalled();
+										.spyOn( AutoImmutable.prototype, 'connect' )
+										.mockReturnValue( connection );
 
-									const store = ctx0.stream( selectorMapOnRender );
+									const ctx = new EagleEyeContextClass( cache );
 
-									expect( getSpy ).toHaveBeenCalledTimes( 2 );
-									expect( getSpy.mock.calls[ 1 ] ).toEqual(
-										Object.values( selectorMapOnRender )
+									getSpy.mockClear();
+
+									const store = ctx.stream( selectorMapOnRender );
+
+									expect( getSpy ).toHaveBeenCalledTimes( 1 );
+									expect( getSpy ).toHaveBeenCalledWith(
+										...Object.values( selectorMapOnRender )
 									);
 									getSpy.mockClear();
 
@@ -1394,9 +1381,10 @@ describe( 'EagleEyeContext', () => {
 
 									getSpy.mockRestore();
 									connectSpy.mockRestore();
-									cacheSpy.mockRestore();
 
 									store.endStream();
+
+									ctx.dispose();
 								});
 								test( 'sets up new subscription with the consumer', () => {
 									const mockSubscribe = jest.fn()
@@ -1451,7 +1439,7 @@ describe( 'EagleEyeContext', () => {
 						} );
 						describe( 'when the new selectorMap is empty', () => {
 							describe( 'and existing data is not empty', () => {
-								test( 'adjusts the store on selctorMap change', () => {
+								test( 'adjusts the store on selectorMap change', () => {
 									const store = ctx0.stream( selectorMapOnRender );
 									expect( Object.keys( store.data ) )
 										.toEqual( Object.keys( selectorMapOnRender ));
@@ -1468,17 +1456,19 @@ describe( 'EagleEyeContext', () => {
 									const connectSpy = jest
 										.spyOn( cache, 'connect' )
 										.mockReturnValue( connection );
-									const cacheSpy = jest
-										.spyOn( AutoImmutableModule, 'default' )
-										.mockReturnValue( cache );
 									const ctx = new EagleEyeContextClass( cache );
 									const streamSpy = jest
-										.spyOn( EagleEyeContextClass.prototype, 'stream' )
-										.mockReturnValue( new LiveStore( ctx ) );
+										// @ts-expect-error
+										.spyOn( EagleEyeContextClass.prototype, 'stream', 'get' )
+										// @ts-expect-error
+										.mockReturnValue( s => new LiveStore( ctx, s ));
+
+									connectSpy.mockClear();
+									disconnectSpy.mockClear();
 
 									const store = ctx.stream( selectorMapOnRender );
 
-									expect( connectSpy ).toHaveBeenCalledTimes( 3 );
+									expect( connectSpy ).toHaveBeenCalledTimes( 1 );
 									expect( disconnectSpy ).not.toHaveBeenCalled();
 
 									connectSpy.mockClear();
@@ -1491,14 +1481,13 @@ describe( 'EagleEyeContext', () => {
 									connectSpy.mockRestore();
 									disconnectSpy.mockRestore();
 									getSpy.mockRestore();
-									cacheSpy.mockRestore();
 									streamSpy.mockRestore();
 
 									store.endStream();
 
 									ctx.dispose();
 								} );
-								test( 'refreshes state data with empty object', async () => {
+								test( 'refreshes state data with empty object', () => {
 									const cache = new AutoImmutable( createSourceData() );
 									const connection = cache.connect();
 									const getSpy = jest
@@ -1507,20 +1496,20 @@ describe( 'EagleEyeContext', () => {
 									const connectSpy = jest
 										.spyOn( cache, 'connect' )
 										.mockReturnValue( connection );
-									const cacheSpy = jest
-										.spyOn( AutoImmutableModule, 'default' )
-										.mockReturnValue( cache );
 									const ctx = new EagleEyeContextClass( cache );
 									const streamSpy = jest
-										.spyOn( EagleEyeContextClass.prototype, 'stream' )
-										.mockReturnValue( new LiveStore( ctx ) );
-									expect( getSpy ).not.toHaveBeenCalled();
-									
+										// @ts-expect-error
+										.spyOn( EagleEyeContextClass.prototype, 'stream', 'get' )
+										// @ts-expect-error
+										.mockReturnValue( s => new LiveStore( ctx, s ));
+
+									getSpy.mockClear();
+
 									const store = ctx.stream( selectorMapOnRender );
 
-									expect( getSpy ).toHaveBeenCalledTimes( 2 );
-									expect( getSpy.mock.calls[ 1 ] ).toEqual(
-										Object.values( selectorMapOnRender )
+									expect( getSpy ).toHaveBeenCalledTimes( 1 );
+									expect( getSpy ).toHaveBeenCalledWith(
+										...Object.values( selectorMapOnRender )
 									);
 									getSpy.mockClear();
 
@@ -1532,7 +1521,6 @@ describe( 'EagleEyeContext', () => {
 
 									connectSpy.mockRestore();
 									getSpy.mockRestore();
-									cacheSpy.mockRestore();
 									streamSpy.mockRestore();
 
 									store.endStream();
@@ -1582,7 +1570,7 @@ describe( 'EagleEyeContext', () => {
 								test( 'leaves the store as-is on selctorMap change', () => {
 									let _origData : typeof mockGetReturnValue = {};
 									const store = ctx0.stream();
-									expect( Object.keys( store.data ) ).toBe( 0 );
+									expect( store.data ).toEqual({});
 									_origData = store.data as typeof mockGetReturnValue;
 									store.selectorMap = undefined;
 									expect( store.data ).toBe( _origData );
@@ -1881,6 +1869,7 @@ describe( 'EagleEyeContext', () => {
 					describe( 'when selectorMap is present in the consumer', () => {
 						describe( 'and called with own property paths arguments to reset', () => {
 							test( 'resets with original slices and removes non-original slices for entries found in property paths', () => {
+								jest.useFakeTimers();
 								const sourceData = createSourceData();
 								const cache = new AutoImmutable( sourceData );
 								const connection = cache.connect();
@@ -1902,10 +1891,15 @@ describe( 'EagleEyeContext', () => {
 								store.endStream();
 
 								ctx.dispose();
+								jest.useRealTimers();
 							} );
 						} );
 						describe( 'and called with NO own property paths argument to reset', () => {
-							test( 'calculates setstate changes using state slice matching property paths derived from the selectorMap', () => {
+							// @debug
+							test( '1xxxx', () => {
+							// test( 'calculates setstate changes using state slice matching property paths derived from the selectorMap', () => {
+								jest.useFakeTimers();
+
 								const sourceData = createSourceData();
 								const cache = new AutoImmutable( sourceData );
 								const connection = cache.connect();
@@ -1943,15 +1937,25 @@ describe( 'EagleEyeContext', () => {
 								store.endStream();
 
 								ctx.dispose();
+
+								jest.useRealTimers();
 							} );
 						} );
 					} );
 					describe( 'when selectorMap is NOT present in the consumer', () => {
 						describe( 'and called with own property paths arguments to reset', () => {
-							test( 'resets with original slices and removes non-original slices for entries found in property paths', () => {
+							// @debug
+							test( '1xxxx', () => {
+							// test( 'resets with original slices and removes non-original slices for entries found in property paths', () => {
+								jest.useFakeTimers();
+
 								const sourceData = createSourceData();
 								const cache = new AutoImmutable( sourceData );
 								const connection = cache.connect();
+
+								// @debug
+								console.info( 'CONNECTION >>>> ', connection.instanceId );
+								
 								const setSpy = jest.spyOn( connection, 'set' );
 								const connectSpy = jest
 									.spyOn( cache, 'connect' )
@@ -1973,23 +1977,25 @@ describe( 'EagleEyeContext', () => {
 								store.endStream();
 
 								ctx.dispose();
+
+								jest.useRealTimers();
 							} );
 						} );
 						describe( 'and called with NO own property paths arguments to reset', () => {
-							test( 'calculates resetstate changes using no property paths -- the consumer applies no store reset', () => {
-								const sourceData = createSourceData();
-								const cache = new AutoImmutable( sourceData );
+							test( 'is a noop', () => {
+								const cache = new AutoImmutable( createSourceData() );
 								const connection = cache.connect();
 								const setSpy = jest.spyOn( connection, 'set' );
-								const connectSpy = jest.spyOn( cache, 'connect' )
-									.mockReturnValue( connection );
+								const connectSpy = jest.spyOn(
+									cache, 'connect'
+								).mockReturnValue( connection );
 								const ctx = new EagleEyeContextClass( cache );
 								const store = ctx.stream();
 								setSpy.mockClear();
+
 								store.resetState();
 
-								expect( setSpy ).toHaveBeenCalledTimes( 1 );
-								expect( setSpy.mock.calls[ 0 ][ 0 ] ).toEqual({});
+								expect( setSpy ).not.toHaveBeenCalled();
 
 								connectSpy.mockRestore();
 								setSpy.mockRestore();

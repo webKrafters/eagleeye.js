@@ -7,9 +7,6 @@
   "contributors": [
     "steveswork <stephen.isienyi@gmail.com> (https://github.com/steveswork)"
   ],
-  "dependencies": {
-    "@webkrafters/auto-immutable": "^2.0.3"
-  },
   "description": "Context stream - Observable and Update-friendly immutable data.",
   "devDependencies": {
     "@babel/cli": "^7.17.0",
@@ -102,5 +99,8 @@
     "test:watch": "eslint --fix && jest --updateSnapshot --watchAll"
   },
   "types": "dist/index.d.ts",
-  "version": "0.0.1"
+  "version": "0.0.1",
+  "dependencies": {
+    "@webkrafters/auto-immutable": "^2.0.4"
+  }
 }

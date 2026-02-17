@@ -99,7 +99,6 @@ export class LiveStore<
 		}
 		this.subscribe();
 		this._integrateSelectors( selectorMap );
-		this._refreshDataRef();
 		this._phase = Phase.OPENED;
 	}
 	
@@ -117,15 +116,15 @@ export class LiveStore<
 			|| this._phase === Phase.UN_OPENED
 		) { return }
 		this._updateStoreRef();
-		if( isEmpty( selectorMap ) ) {
-			this._selectorMap = null;
-			this._data = {} as typeof this._data;
-			this._refreshDataRef();
-		} else {
-			this._integrateSelectors( selectorMap );
+		if( !isEmpty( selectorMap ) ) {
 			this.subscribe();
-			this._updateData();
+			this._integrateSelectors( selectorMap );
+			return;
 		}
+		if( this._selectorMap === null ) { return }
+		this._selectorMap = null;
+		this._data = {} as typeof this._data;
+		this._refreshDataRef();
 	}
 
 	addListener( eventType : 'stream-ending', listener : ShutdownMonitor ) : void;
@@ -152,7 +151,7 @@ export class LiveStore<
 	
 	@streamable
 	resetState( propertyPaths = this._renderKeys ) {
-		this._ctxStoreRef.resetState( propertyPaths );
+		propertyPaths.length && this._ctxStoreRef.resetState( propertyPaths );
 	}
 
 	@streamable
@@ -173,7 +172,7 @@ export class LiveStore<
 	}
 
 	private get _renderKeys() {
-		return Object.values( this._selectorMap as {} ) as Array<string>;
+		return Object.values( ( this._selectorMap as {} ) ?? {} ) as Array<string>;
 	}
 
 	private _dataSourceListener : Listener = (
@@ -190,11 +189,14 @@ export class LiveStore<
 	private _integrateSelectors( selectorMap : S ) {
 		this._selectorMap = selectorMap;
 		const state = this._ctxStoreRef.getState( this._renderKeys );
+		const newData = {} as typeof this._data;
 		for( const k in selectorMap ) {
-			this._data[ k as string ] = selectorMap[ k ] !== FULL_STATE_SELECTOR
+			newData[ k as string ] = selectorMap[ k ] !== FULL_STATE_SELECTOR
 				? get( state, selectorMap[ k ] as string ).value
 				: state;
 		}
+		this._data = newData;
+		this._refreshDataRef();
 	}
 
 	private _reclaim() {
@@ -462,6 +464,14 @@ export class EagleEyeContext<T extends State = State>{
 				}
 			}
 		}
+		
+
+		// @debug
+		console.info( 'CONNECTION --- >>>> ', connection.instanceId );
+		// @debug
+		console.info( '><><><>><><>>>>>>>>>+> ', connection.get );
+		console.info( '><><><>><><>>>>>>>>>+> ', connection.get( constants.GLOBAL_SELECTOR ) );
+			
 		runPrehook( this._prehooks, 'resetState', [
 			resetData, {
 				current: connection.get()[ GLOBAL_SELECTOR ],
