@@ -97,7 +97,6 @@ export class LiveStore<
 			this._phase = Phase.OPENED;
 			return;
 		}
-		this.subscribe();
 		this._integrateSelectors( selectorMap );
 		this._phase = Phase.OPENED;
 	}
@@ -110,21 +109,15 @@ export class LiveStore<
 	
 	@streamable
 	set selectorMap( selectorMap : S ) {
-		selectorMap = selectorMap ?? null;
-		if( selectorMap === this.selectorMap
-			|| isEqual( selectorMap, this.selectorMap )
+		if( !selectorMap || isEmpty( selectorMap ) ) {
+			selectorMap = null;
+		}
+		if( selectorMap === this._selectorMap
+			|| isEqual( selectorMap, this._selectorMap )
 			|| this._phase === Phase.UN_OPENED
 		) { return }
 		this._updateStoreRef();
-		if( !isEmpty( selectorMap ) ) {
-			this.subscribe();
-			this._integrateSelectors( selectorMap );
-			return;
-		}
-		if( this._selectorMap === null ) { return }
-		this._selectorMap = null;
-		this._data = {} as typeof this._data;
-		this._refreshDataRef();
+		this._integrateSelectors( selectorMap );
 	}
 
 	addListener( eventType : 'stream-ending', listener : ShutdownMonitor ) : void;
@@ -161,7 +154,9 @@ export class LiveStore<
 
 	@streamable
 	protected subscribe() {
-		this._unsubscribe ||= this._ctxStoreRef.subscribe( 'data-updated', this._dataSourceListener );
+		this._unsubscribe ||= this._ctxStoreRef.subscribe(
+			'data-updated', this._dataSourceListener
+		);
 	}
 
 	@streamable
@@ -188,6 +183,11 @@ export class LiveStore<
 
 	private _integrateSelectors( selectorMap : S ) {
 		this._selectorMap = selectorMap;
+		if( !selectorMap ) {
+			this._data = {} as typeof this._data;
+			return this._refreshDataRef();
+		}
+		this.subscribe();
 		const state = this._ctxStoreRef.getState( this._renderKeys );
 		const newData = {} as typeof this._data;
 		for( const k in selectorMap ) {
@@ -200,7 +200,7 @@ export class LiveStore<
 	}
 
 	private _reclaim() {
-		this.unsubscribe();
+		this._selectorMap && this.unsubscribe();
 		this._unsubClosing()
 		this._context = null;
 		this._ctxStoreRef = null;
@@ -254,7 +254,7 @@ export class LiveStore<
 	}
 
 	private _updateStoreRef() {
-		this.unsubscribe();
+		this._selectorMap && this.unsubscribe();
 		this._unsubClosing();
 		this._ctxStoreRef.close();
 		this._setupStoreRef();
@@ -464,14 +464,6 @@ export class EagleEyeContext<T extends State = State>{
 				}
 			}
 		}
-		
-
-		// @debug
-		console.info( 'CONNECTION --- >>>> ', connection.instanceId );
-		// @debug
-		console.info( '><><><>><><>>>>>>>>>+> ', connection.get );
-		console.info( '><><><>><><>>>>>>>>>+> ', connection.get( constants.GLOBAL_SELECTOR ) );
-			
 		runPrehook( this._prehooks, 'resetState', [
 			resetData, {
 				current: connection.get()[ GLOBAL_SELECTOR ],
@@ -578,7 +570,7 @@ function getState<T extends State>(
 ) : Readonly<Partial<T>> {
 	const { FULL_STATE_SELECTOR, GLOBAL_SELECTOR } = constants;
 	if( !propertyPaths.length || propertyPaths.indexOf( FULL_STATE_SELECTOR ) !== -1  ) {
-		return connection.get()[ GLOBAL_SELECTOR ]
+		return connection.get()[ GLOBAL_SELECTOR ];
 	}
 	const data = connection.get( ...propertyPaths );
 	const state : Partial<T> = {};

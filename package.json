@@ -101,6 +101,6 @@
   "types": "dist/index.d.ts",
   "version": "0.0.1",
   "dependencies": {
-    "@webkrafters/auto-immutable": "^2.0.4"
+    "@webkrafters/auto-immutable": "^2.0.5"
   }
 }
