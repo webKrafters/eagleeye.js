@@ -237,18 +237,13 @@ export class LiveStore<
 				continue;
 			}
 			const keys = Object.keys( this._data[ label ] ?? {} );
-			if( keys.length !== Object.keys( state ).length ) {
-				this._data[ label ] = state;
-				hasChanges = true;
-				continue;
+			let _hasChanges = keys.length !== Object.keys( state ).length;
+			for( let i = keys.length, data = this._data[ label ]; !_hasChanges && i--; ) {
+				_hasChanges = data[ keys[ i ] ] !== state[ keys[ i ] ];
 			}
-			for( let i = keys.length, data = this._data[ label ]; i--; ) {
-				if( data[ keys[ i ] ] !== state[ keys[ i ] ] ) {
-					this._data[ label ] = state;
-					hasChanges = true;
-					break;
-				}
-			}
+			if( !_hasChanges ) { continue }
+			this._data[ label ] = state;
+			hasChanges = true;
 		}
 		hasChanges && this._refreshDataRef();
 	}
@@ -477,15 +472,7 @@ export class EagleEyeContext<T extends State = State>{
 		connection : Connection<T>,
 		changes : Changes<T>
 	) {
-		if( !runPrehook( this._prehooks, 'setState', [ changes ] ) ) { return }
-		if( !Array.isArray( changes ) ) {
-			changes = transformPayload( changes );
-		} else {
-			changes = changes.slice();
-			for( let c = changes.length; c--; ) {
-				changes[ c ] = transformPayload( changes[ c ] );
-			}
-		}
+		runPrehook( this._prehooks, 'setState', [ changes ] ) &&
 		connection.set( changes, this.createUpdateEmitterFor( changes ) );
 	}
 
@@ -600,13 +587,6 @@ function runPrehook<T extends State>( prehooks, name, args ) : boolean {
 		throw new TypeError( `\`${ name }\` prehook must return a boolean value.` );
 	}
 	return res;
-}
-
-function transformPayload<T extends State>( payload : UpdatePayload<T> ) {
-	if( isEmpty( payload ) || !( constants.FULL_STATE_SELECTOR in payload ) ) { return payload }
-	payload = { ...payload, [ constants.GLOBAL_SELECTOR ]: payload[ constants.FULL_STATE_SELECTOR ] };
-	delete payload[ constants.FULL_STATE_SELECTOR ];
-	return payload;
 }
 
 function invokable<C>( method: Function, context: C ) {
