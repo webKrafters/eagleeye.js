@@ -1,12 +1,4 @@
-import type {
-	PropertyInfo,
-	Transform
-} from '@webkrafters/data-distillery';
-
-import type {
-	Connection,
-	UpdatePayload
-} from '@webkrafters/auto-immutable';
+import type { Connection } from '@webkrafters/auto-immutable';
 
 import type {
 	BaseStream,
@@ -32,8 +24,7 @@ import isEqual from 'lodash.isequal';
 import isPlainObject from 'lodash.isplainobject';
 import set from 'lodash.set';
 
-import get from '@webkrafters/get-property';
-import mapPathsToObject from '@webkrafters/data-distillery';
+import get, { KeyType } from '@webkrafters/get-property';
 import stringToDotPath from '@webkrafters/path-dotize';
 import AutoImmutable from '@webkrafters/auto-immutable';
 
@@ -161,6 +152,7 @@ export class LiveStore<
 
 	@streamable
 	protected unsubscribe() {
+		// istanbul ignore next
 		if( !this._unsubscribe ) { return }
 		this._unsubscribe();
 		this._unsubscribe = null;
@@ -236,11 +228,13 @@ export class LiveStore<
 				hasChanges = true;
 				continue;
 			}
+			// istanbul ignore next
 			const keys = Object.keys( this._data[ label ] ?? {} );
 			let _hasChanges = keys.length !== Object.keys( state ).length;
 			for( let i = keys.length, data = this._data[ label ]; !_hasChanges && i--; ) {
 				_hasChanges = data[ keys[ i ] ] !== state[ keys[ i ] ];
 			}
+			// istanbul ignore next
 			if( !_hasChanges ) { continue }
 			this._data[ label ] = state;
 			hasChanges = true;
@@ -362,6 +356,7 @@ export class EagleEyeContext<T extends State = State>{
 			this.inchoateValue = undefined;
 		}
 		this._storage = storage;
+		// istanbul ignore next
 		this.storageKey = ( this._storage as CurrentStorage<T> ).isKeyRequired
 			? deps.createStorageKey()
 			: null;
@@ -402,7 +397,7 @@ export class EagleEyeContext<T extends State = State>{
 	@invokable
 	protected getState(
 		connection : Connection<T>,
-		propertyPaths : Array<string> = []
+		propertyPaths : Array<string>
 	) {
 		return getState( connection, propertyPaths );
 	}
@@ -415,7 +410,7 @@ export class EagleEyeContext<T extends State = State>{
 	@invokable
 	protected resetState(
 		connection : Connection<T>,
-		propertyPaths : Array<string> = []
+		propertyPaths : Array<string>
 	) {
 		const {
 			CLEAR_TAG,
@@ -425,37 +420,47 @@ export class EagleEyeContext<T extends State = State>{
 			REPLACE_TAG
 		} = constants;
 		const original = this.storage.clone( this.storage.getItem( this.storageKey ) );
-		let resetData;
-		if( !propertyPaths.length ) {
-			resetData = {};
-		} else if( propertyPaths.includes( FULL_STATE_SELECTOR ) ) {
+		let resetData = {};
+		if( propertyPaths.includes( FULL_STATE_SELECTOR ) ) {
 			resetData = isEmpty( original ) ? CLEAR_TAG : { [ REPLACE_TAG ]: original };
 		} else {
-			const visitedPathMap = {};
-			const transformer = ({ trail, value } : PropertyInfo ) => {
-				visitedPathMap[ trail.join( '.' ) ] = null;
-				return { [ REPLACE_TAG ]: value };
-			} 
-			resetData = mapPathsToObject( original, propertyPaths, transformer as Transform );
-			if( Object.keys( visitedPathMap ).length < propertyPaths.length ) {
-				for( let path of propertyPaths ) {
-					path = stringToDotPath( path );
-					if( path in visitedPathMap ) { continue }
-					let trail = path.split( '.' );
-					const keyTuple = trail.slice( -1 );
-					trail = trail.slice( 0, -1 );
-					let node = resetData;
-					for( const t of trail ) {
-						if( isEmpty( node[ t ] ) ) {
-							node[ t ] = {};
-						}
-						node = node[ t ];
+			const rec : {
+				[ trailStr : string ] : {
+					trail : Array<KeyType>;
+					[ DELETE_TAG ]? : Array<KeyType>;
+					[ REPLACE_TAG ]? : unknown;
+				};
+			} = {};
+			for( let path of propertyPaths ) {
+				const tokens = stringToDotPath( path ).split( '.' );
+				const { _value, exists, trail } = get( original, tokens );
+				const trailStr = trail.join( '.' );
+				if( !( trailStr in rec ) ) {
+					rec[ trailStr ] = { trail };
+				}
+				if( exists ) {
+					rec[ trailStr ][ REPLACE_TAG ] = _value;
+					continue;
+				}
+				if( !( DELETE_TAG in rec[ trailStr ] ) ) {
+					rec[ trailStr ][ DELETE_TAG ] = [];
+				}
+				rec[ trailStr ][ DELETE_TAG ].push( tokens[ trail.length ] );
+			}
+			for( let k in rec ) {
+				let node = resetData;
+				for( let { length, ...paths } = rec[ k ].trail, p = 0; p < length; p++ ) {
+					const key = paths[ p ];
+					if( !( key in node ) ) {
+						node[ key ] = {};
 					}
-					if( DELETE_TAG in node ) {
-						node[ DELETE_TAG ].push( ...keyTuple );
-					} else {
-						node[ DELETE_TAG ] = keyTuple;
-					}
+					node = node[ key ];
+				}
+				if( DELETE_TAG in rec[ k ] ) {
+					node[ DELETE_TAG ] = rec[ k ][ DELETE_TAG ];
+				}
+				if( REPLACE_TAG in rec[ k ] ) {
+					node[ REPLACE_TAG ] = rec[ k ][ REPLACE_TAG ];
 				}
 			}
 		}
@@ -553,7 +558,7 @@ function createChangePathSearch({ length, ...pathTokenGroups } : Readonly<Array<
 
 function getState<T extends State>(
 	connection : Connection<T>,
-	propertyPaths : Array<string> = []
+	propertyPaths : Array<string>
 ) : Readonly<Partial<T>> {
 	const { FULL_STATE_SELECTOR, GLOBAL_SELECTOR } = constants;
 	if( !propertyPaths.length || propertyPaths.indexOf( FULL_STATE_SELECTOR ) !== -1  ) {

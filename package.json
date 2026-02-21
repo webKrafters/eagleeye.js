@@ -23,7 +23,6 @@
     "@types/lodash.isplainobject": "^4.0.9",
     "@types/node": "^20.11.28",
     "@webkrafters/clone-total": "^1.0.1",
-    "@webkrafters/data-distillery": "^0.1.1",
     "@webkrafters/get-property": "^2.0.0",
     "@webkrafters/path-dotize": "0.0.2",
     "@webkrafters/timed-map": "^2.0.0",
@@ -75,7 +74,6 @@
   "name": "@webkrafters/eagleeye",
   "peerDependencies": {
     "@webkrafters/clone-total": ">= 1.0.1",
-    "@webkrafters/data-distillery": ">= 0.0.3",
     "@webkrafters/path-dotize": ">= 0.0.2",
     "lodash.isboolean": ">= 0.1.0",
     "lodash.isempty": ">= 0.1.0",

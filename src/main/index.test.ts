@@ -553,6 +553,79 @@ describe( 'EagleEyeContext', () => {
 					} );
 				} );
 			} );
+			test( 'ignores unknown prehooks', () => {
+				const cache = new AutoImmutable({});
+				const connection = cache.connect();
+				const connectGetSpy = jest.spyOn( connection, 'get' ).mockReturnValue({});
+				const connectSetSpy = jest.spyOn( connection, 'set' ).mockReturnValue( undefined );
+				const AutoImmutableSpy = jest.spyOn( AutoImmutable.prototype, 'connect' );
+				AutoImmutableSpy.mockReturnValue( connection );
+
+				const prehooksMock = {
+					testing: jest.fn()
+				} as Prehooks<SourceData>;
+				
+				const ctx = new EagleEyeContextClass<any>( undefined, prehooksMock );
+				
+				connectSetSpy.mockClear();
+				
+				// applies to externally generated updates
+				ctx.store.setState({ any: 'thing' });
+				expect(( prehooksMock as any ).testing ).not.toHaveBeenCalled();
+				ctx.store.resetState([ 'any' ]);
+				expect(( prehooksMock as any ).testing ).not.toHaveBeenCalled();
+
+				// also applies to stream generated updates
+				const liveStore = ctx.stream();
+				liveStore.setState([ 'stream' ]);
+				expect(( prehooksMock as any ).testing ).not.toHaveBeenCalled();
+				liveStore.resetState([ 'stream' ]);
+				expect(( prehooksMock as any ).testing ).not.toHaveBeenCalled();
+
+				liveStore.endStream();
+
+				ctx.dispose();
+
+				connectGetSpy.mockRestore();
+				connectSetSpy.mockRestore();
+				AutoImmutableSpy.mockRestore();
+			} );
+			test( 'throws on non-boolean returning prehooks', () => {
+				const cache = new AutoImmutable({});
+				const connection = cache.connect();
+				const connectGetSpy = jest.spyOn( connection, 'get' ).mockReturnValue({});
+				const connectSetSpy = jest.spyOn( connection, 'set' ).mockReturnValue( undefined );
+				const AutoImmutableSpy = jest.spyOn( AutoImmutable.prototype, 'connect' );
+				AutoImmutableSpy.mockReturnValue( connection );
+				
+				const ctx = new EagleEyeContextClass<any>( undefined, {
+					resetState: jest.fn().mockReturnValue( expect.anything() ),
+					setState: jest.fn().mockReturnValue( expect.anything() )
+				} );
+				
+				connectSetSpy.mockClear();
+				
+				// applies to externally generated updates
+				expect(() => ctx.store.setState({ any: 'thing' }))
+					.toThrow( '`setState` prehook must return a boolean value.' );
+				expect(() => ctx.store.resetState([ 'any' ]))
+					.toThrow( '`resetState` prehook must return a boolean value.' );
+
+				// also applies to stream generated updates
+				const liveStore = ctx.stream();
+				expect(() => liveStore.setState([ 'stream' ]))
+					.toThrow( '`setState` prehook must return a boolean value.' );
+				expect(() => liveStore.resetState([ 'stream' ]))
+					.toThrow( '`resetState` prehook must return a boolean value.' );
+
+				liveStore.endStream();
+
+				ctx.dispose();
+
+				connectGetSpy.mockRestore();
+				connectSetSpy.mockRestore();
+				AutoImmutableSpy.mockRestore();
+			} );
 		} );
 		describe( 'EagleEyeContext.storage', () => {
 			test( 'can be set and retrieved', () => {
@@ -796,30 +869,10 @@ describe( 'EagleEyeContext', () => {
 						'phone.country',
 						'phone.area',
 						'phone.local',
-						'phone.line'
+						'phone.line',
+						FULL_STATE_SELECTOR
 					]);
-					ctx.store.setState({
-						name: {
-							first: 'Imagene'
-						} as SourceData["name"],
-						phone: {
-							area: '212',
-							line: '5000',
-							local: '555'
-						} as SourceData["phone"],
-					});
-					expect( liveStore1.data ).toEqual({
-						b: '$3,311.66',
-						f: 'Imagene',
-						g: 'female'
-					});
-					expect( liveStore2.data ).toEqual({
-						0: '+1',
-						1: '212',
-						2: '555',
-						3: '5000'
-					});
-					ctx.store.resetState([ FULL_STATE_SELECTOR ]);
+					
 					expect( liveStore1.data ).toEqual({
 						b: '$3,311.66',
 						f: 'Amber',
@@ -829,8 +882,69 @@ describe( 'EagleEyeContext', () => {
 						0: '+1',
 						1: '947',
 						2: '552',
-						3: '2282'
+						3: '2282',
+						4: sourceData
 					});
+					expect( ctx.store.getState([ 'newProperty' ]) )
+						.toEqual({ newProperty: undefined });
+					
+					ctx.store.setState({
+						name: {
+							first: 'Imagene'
+						} as SourceData["name"],
+						phone: {
+							area: '212',
+							line: '5000',
+							local: '555'
+						} as SourceData["phone"],
+						newProperty: 'some test value'
+					} as AutoImmutableModule.Changes<SourceData>);
+
+					expect( liveStore1.data ).toEqual({
+						b: '$3,311.66',
+						f: 'Imagene',
+						g: 'female'
+					});
+					expect( liveStore2.data ).toEqual({
+						0: '+1',
+						1: '212',
+						2: '555',
+						3: '5000',
+						4: {
+							...sourceData,
+							name: {
+								...sourceData.name,
+								first: 'Imagene'
+							},
+							phone: {
+								...sourceData.phone,
+								area: '212',
+								line: '5000',
+								local: '555'
+							},
+							newProperty: 'some test value'
+						}
+					});
+					expect( ctx.store.getState([ 'newProperty' ]) )
+						.toEqual({ newProperty: 'some test value' });
+
+					ctx.store.resetState([ FULL_STATE_SELECTOR ]);
+
+					expect( liveStore1.data ).toEqual({
+						b: '$3,311.66',
+						f: 'Amber',
+						g: 'female'
+					});
+					expect( liveStore2.data ).toEqual({
+						0: '+1',
+						1: '947',
+						2: '552',
+						3: '2282',
+						4: sourceData
+					});
+					expect( ctx.store.getState([ 'newProperty' ]) )
+						.toEqual({ newProperty: undefined });
+					
 					liveStore1.endStream();
 					liveStore2.endStream();
 					ctx.dispose();
@@ -1882,12 +1996,13 @@ describe( 'EagleEyeContext', () => {
 								const ctx = new EagleEyeContextClass( sourceData );
 								const store = ctx.stream( selectorMapOnRender );
 								setSpy.mockClear();
-								store.resetState([ 'blatant', 'company', 'xylophone', 'yodellers', 'zenith' ]);
+								store.resetState([ 'blatant', 'company', 'xylophone', 'yodellers[5]', 'to.the.zenith' ]);
 								expect( setSpy ).toHaveBeenCalledTimes( 1 );
 								expect( setSpy.mock.calls[ 0 ][ 0 ] ).toEqual({
-									[ DELETE_TAG ]: [ 'blatant', 'xylophone', 'yodellers', 'zenith' ],
+									[ DELETE_TAG ]: [ 'blatant', 'xylophone', 'yodellers', 'to' ],
 									company: { [ REPLACE_TAG ]: sourceData.company }
 								});
+
 								connectSpy.mockRestore();
 								setSpy.mockRestore();
 
