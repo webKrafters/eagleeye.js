@@ -942,8 +942,68 @@ describe( 'EagleEyeContext', () => {
 						3: '2282',
 						4: sourceData
 					});
+					expect( ctx.store.getState() ).toEqual( sourceData );
 					expect( ctx.store.getState([ 'newProperty' ]) )
 						.toEqual({ newProperty: undefined });
+
+					liveStore2.setState({
+						friends: {
+							1: {
+								age: 44,
+								name: {
+									middles: [ 'Ruth' ]
+								}
+							}
+						}
+					} as unknown as AutoImmutableModule.Changes<SourceData> );
+
+					expect( liveStore1.data ).toEqual({
+						b: '$3,311.66',
+						f: 'Amber',
+						g: 'female'
+					});
+					expect( liveStore2.data ).toEqual({
+						0: '+1',
+						1: '947',
+						2: '552',
+						3: '2282',
+						4: {
+							...sourceData,
+							friends: [
+								sourceData.friends[ 0 ],
+								{
+									...sourceData.friends[ 1 ],
+									age: 44,
+									name: {
+										...sourceData.friends[ 1 ].name,
+										middles: [ 'Ruth' ]
+									}
+								},
+								...sourceData.friends.slice( 2 )
+							]
+						}
+					});
+
+					ctx.store.resetState([
+						'friends.1',
+						'friends.1.age',
+						'friends.1',
+						'friends.1.name.middles'
+					]);
+
+					expect( liveStore1.data ).toEqual({
+						b: '$3,311.66',
+						f: 'Amber',
+						g: 'female'
+					});
+					expect( liveStore2.data ).toEqual({
+						0: '+1',
+						1: '947',
+						2: '552',
+						3: '2282',
+						4: sourceData
+					});
+					expect( ctx.store.getState() ).toEqual( sourceData );
 					
 					liveStore1.endStream();
 					liveStore2.endStream();
