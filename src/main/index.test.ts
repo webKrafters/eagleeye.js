@@ -859,7 +859,13 @@ describe( 'EagleEyeContext', () => {
 					ctx.dispose();
 				} );
 				test( 'can reset state and propagate to all streaming components', () => {
-					const ctx = new EagleEyeContextClass( createSourceData() );
+					const cache = new AutoImmutable( sourceData );
+					const connection = cache.connect();
+					const setSpy = jest.spyOn( connection, 'set' );
+					const connectSpy = jest
+						.spyOn( AutoImmutable.prototype, 'connect' )
+						.mockReturnValue( connection );
+;					const ctx = new EagleEyeContextClass( sourceData );
 					const liveStore1 = ctx.stream({
 						b: 'balance',
 						f: 'name.first',
@@ -984,12 +990,42 @@ describe( 'EagleEyeContext', () => {
 						}
 					});
 
+					setSpy.mockClear();
 					ctx.store.resetState([
-						'friends.1',
 						'friends.1.age',
 						'friends.1',
-						'friends.1.name.middles'
+						'friends.1.name.middles',
+						'friends.8',
+						'name',
+						'friends.8.name',
+						'name.first'
 					]);
+					expect( setSpy ).toHaveBeenCalledWith({
+						friends: {
+							1: {
+								'@@REPLACE': {
+									id: 1,
+									name: {
+										first: 'Holly',
+										last: 'Roberson'
+									}
+								}
+							},
+							'@@DELETE': [ '8' ]
+						},
+						name: {
+							'@@REPLACE': {
+								first: 'Amber',
+								last: 'Sears'
+							}
+						}
+					}, expect.any( Function ));
+
+					// @debug
+					console.info(
+						'WHAT DO WE HAVE ?????? ',
+						ctx.store.getState()
+					);
 
 					expect( liveStore1.data ).toEqual({
 						b: '$3,311.66',
@@ -1004,10 +1040,15 @@ describe( 'EagleEyeContext', () => {
 						4: sourceData
 					});
 					expect( ctx.store.getState() ).toEqual( sourceData );
+
+					setSpy.mockRestore();
+					connectSpy.mockRestore();
 					
 					liveStore1.endStream();
 					liveStore2.endStream();
 					ctx.dispose();
+					connection.disconnect();
+					cache.close();
 				});
 				test( 'subscribes to context exit', () => {
 					/** context disposal initiates closing process */

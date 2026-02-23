@@ -424,28 +424,74 @@ export class EagleEyeContext<T extends State = State>{
 		if( propertyPaths.includes( FULL_STATE_SELECTOR ) ) {
 			resetData = isEmpty( original ) ? CLEAR_TAG : { [ REPLACE_TAG ]: original };
 		} else {
-			// @debug
 			for( let path of propertyPaths ) {
 				let node = resetData;
 				const tokens = stringToDotPath( path ).split( '.' );
 				const { _value, exists, trail } = get( original, tokens );
-				if( exists ) {
+				L0: if( exists ) {
 					for( let { length, ...keys } = trail, k = 0; k < length; k++ ) {
-						// istanbul ignore next
-						if( REPLACE_TAG in node ) { break }
+					
+					
+						// @debug
+						const _key = keys[ k ];
+						console.info( '1 ><><><><><>< ', {
+							path,
+							node: JSON.stringify( node, null, 2 ),
+							resetData: JSON.stringify( resetData, null, 2 ),
+							key: _key,
+							[ 'is tag `' + REPLACE_TAG + '` exist in node -- stopping here >>>>> ' ]:
+							REPLACE_TAG in node 
+						} );
+						
+					
+						if( REPLACE_TAG in node ) { break L0 }
 						const key = keys[ k ];
 						if( !( key in node ) ) { node[ key ] = {} }
 						node = node[ key ];
 					}
+					for( const k in node ) { delete node[ k ] }
 					node[ REPLACE_TAG ] = _value;
+
+					// @debug
+					console.info( ' are we here ????? ', {
+						path,
+						node,
+						resetData: JSON.stringify( resetData, null, 2 ),
+						key: trail[ trail.length - 1 ]
+					} );
+
 					continue;
 				}
 				for( let { length, ...keys } = trail, k = 0; k < length; k++ ) {
 					if( REPLACE_TAG in node ) { break }
-					// istanbul ignore next
 					const key = keys[ k ];
-					// istanbul ignore next
-					if( key in ( node[ DELETE_TAG as string ] ?? {} ) ) { break }
+					
+					
+					// @debug
+					console.info( '2 ><><><><><>< ', {
+						path,
+						node: JSON.stringify( node, null, 2 ),
+						resetData: JSON.stringify( resetData, null, 2 ),
+						key,
+						[ 'is tag `' + DELETE_TAG + '` exist in node >>>>> ' ]:
+						DELETE_TAG in node,
+						[ 'is key `' + ( key as string ) + '` exist NOT in node[ ' + DELETE_TAG + ' ] - getting out >>>' ]:
+						!( key in ( node[ DELETE_TAG as string ] ?? {} ) ) 
+					} );
+
+					if( get( node, [ DELETE_TAG, key ] ).exists ) { break }
+
+					// @debug
+					console.info( '3 ><><><><><>< ', {
+						path,
+						node: JSON.stringify( node, null, 2 ),
+						resetData: JSON.stringify( resetData, null, 2 ),
+						key,
+						[ 'is key `' + ( key as string ) + '` NOT in node - adding the empty property >>>' ]:
+						!( key in node ) 
+					} );
+						
+						
 					if( !( key in node ) ) { node[ key ] = {} }
 					node = node[ key ];
 				}
@@ -455,46 +501,11 @@ export class EagleEyeContext<T extends State = State>{
 				!node[ DELETE_TAG ].includes( deletingKey ) &&
 				node[ DELETE_TAG ].push( deletingKey );
 			}
-			// const rec : {
-			// 	[ trailStr : string ] : {
-			// 		trail : Array<KeyType>;
-			// 		[ DELETE_TAG ]? : Array<KeyType>;
-			// 		[ REPLACE_TAG ]? : unknown;
-			// 	};
-			// } = {};
-			// for( let path of propertyPaths ) {
-			// 	const tokens = stringToDotPath( path ).split( '.' );
-			// 	const { _value, exists, trail } = get( original, tokens );
-			// 	const trailStr = trail.join( '.' );
-			// 	if( !( trailStr in rec ) ) {
-			// 		rec[ trailStr ] = { trail };
-			// 	}
-			// 	if( exists ) {
-			// 		rec[ trailStr ][ REPLACE_TAG ] = _value;
-			// 		continue;
-			// 	}
-			// 	if( !( DELETE_TAG in rec[ trailStr ] ) ) {
-			// 		rec[ trailStr ][ DELETE_TAG ] = [];
-			// 	}
-			// 	rec[ trailStr ][ DELETE_TAG ].push( tokens[ trail.length ] );
-			// }
-			// for( let k in rec ) {
-			// 	let node = resetData;
-			// 	for( let { length, ...paths } = rec[ k ].trail, p = 0; p < length; p++ ) {
-			// 		const key = paths[ p ];
-			// 		if( !( key in node ) ) {
-			// 			node[ key ] = {};
-			// 		}
-			// 		node = node[ key ];
-			// 	}
-			// 	if( DELETE_TAG in rec[ k ] ) {
-			// 		node[ DELETE_TAG ] = rec[ k ][ DELETE_TAG ];
-			// 	}
-			// 	if( REPLACE_TAG in rec[ k ] ) {
-			// 		node[ REPLACE_TAG ] = rec[ k ][ REPLACE_TAG ];
-			// 	}
-			// }
 		}
+
+		// @debug
+		console.info( 'FINAL RESET DATA >>>>> ', resetData );
+
 		runPrehook( this._prehooks, 'resetState', [
 			resetData, {
 				current: connection.get()[ GLOBAL_SELECTOR ],
