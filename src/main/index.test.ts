@@ -997,8 +997,10 @@ describe( 'EagleEyeContext', () => {
 						'friends.1.name.middles',
 						'friends.8',
 						'name',
+						'friends.1.age',
 						'friends.8.name',
-						'name.first'
+						'name.first',
+						'friends.1'
 					]);
 					expect( setSpy ).toHaveBeenCalledWith({
 						friends: {
@@ -1020,12 +1022,6 @@ describe( 'EagleEyeContext', () => {
 							}
 						}
 					}, expect.any( Function ));
-
-					// @debug
-					console.info(
-						'WHAT DO WE HAVE ?????? ',
-						ctx.store.getState()
-					);
 
 					expect( liveStore1.data ).toEqual({
 						b: '$3,311.66',

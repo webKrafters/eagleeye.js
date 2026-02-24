@@ -424,74 +424,25 @@ export class EagleEyeContext<T extends State = State>{
 		if( propertyPaths.includes( FULL_STATE_SELECTOR ) ) {
 			resetData = isEmpty( original ) ? CLEAR_TAG : { [ REPLACE_TAG ]: original };
 		} else {
-			for( let path of propertyPaths ) {
+			it_0: for( let path of propertyPaths ) {
 				let node = resetData;
 				const tokens = stringToDotPath( path ).split( '.' );
 				const { _value, exists, trail } = get( original, tokens );
-				L0: if( exists ) {
+				if( exists ) {
 					for( let { length, ...keys } = trail, k = 0; k < length; k++ ) {
-					
-					
-						// @debug
-						const _key = keys[ k ];
-						console.info( '1 ><><><><><>< ', {
-							path,
-							node: JSON.stringify( node, null, 2 ),
-							resetData: JSON.stringify( resetData, null, 2 ),
-							key: _key,
-							[ 'is tag `' + REPLACE_TAG + '` exist in node -- stopping here >>>>> ' ]:
-							REPLACE_TAG in node 
-						} );
-						
-					
-						if( REPLACE_TAG in node ) { break L0 }
+						if( REPLACE_TAG in node ) { continue it_0 }
 						const key = keys[ k ];
 						if( !( key in node ) ) { node[ key ] = {} }
 						node = node[ key ];
 					}
+					if( REPLACE_TAG in node ) { continue }
 					for( const k in node ) { delete node[ k ] }
 					node[ REPLACE_TAG ] = _value;
-
-					// @debug
-					console.info( ' are we here ????? ', {
-						path,
-						node,
-						resetData: JSON.stringify( resetData, null, 2 ),
-						key: trail[ trail.length - 1 ]
-					} );
-
 					continue;
 				}
 				for( let { length, ...keys } = trail, k = 0; k < length; k++ ) {
-					if( REPLACE_TAG in node ) { break }
+					if( REPLACE_TAG in node ) { continue it_0 }
 					const key = keys[ k ];
-					
-					
-					// @debug
-					console.info( '2 ><><><><><>< ', {
-						path,
-						node: JSON.stringify( node, null, 2 ),
-						resetData: JSON.stringify( resetData, null, 2 ),
-						key,
-						[ 'is tag `' + DELETE_TAG + '` exist in node >>>>> ' ]:
-						DELETE_TAG in node,
-						[ 'is key `' + ( key as string ) + '` exist NOT in node[ ' + DELETE_TAG + ' ] - getting out >>>' ]:
-						!( key in ( node[ DELETE_TAG as string ] ?? {} ) ) 
-					} );
-
-					if( get( node, [ DELETE_TAG, key ] ).exists ) { break }
-
-					// @debug
-					console.info( '3 ><><><><><>< ', {
-						path,
-						node: JSON.stringify( node, null, 2 ),
-						resetData: JSON.stringify( resetData, null, 2 ),
-						key,
-						[ 'is key `' + ( key as string ) + '` NOT in node - adding the empty property >>>' ]:
-						!( key in node ) 
-					} );
-						
-						
 					if( !( key in node ) ) { node[ key ] = {} }
 					node = node[ key ];
 				}
@@ -502,10 +453,6 @@ export class EagleEyeContext<T extends State = State>{
 				node[ DELETE_TAG ].push( deletingKey );
 			}
 		}
-
-		// @debug
-		console.info( 'FINAL RESET DATA >>>>> ', resetData );
-
 		runPrehook( this._prehooks, 'resetState', [
 			resetData, {
 				current: connection.get()[ GLOBAL_SELECTOR ],
