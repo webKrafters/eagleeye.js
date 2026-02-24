@@ -424,29 +424,22 @@ export class EagleEyeContext<T extends State = State>{
 		if( propertyPaths.includes( FULL_STATE_SELECTOR ) ) {
 			resetData = isEmpty( original ) ? CLEAR_TAG : { [ REPLACE_TAG ]: original };
 		} else {
-			it_0: for( let path of propertyPaths ) {
+			for( let path of propertyPaths ) {
 				let node = resetData;
 				const tokens = stringToDotPath( path ).split( '.' );
-				const { _value, exists, trail } = get( original, tokens );
-				if( exists ) {
-					for( let { length, ...keys } = trail, k = 0; k < length; k++ ) {
-						if( REPLACE_TAG in node ) { continue it_0 }
-						const key = keys[ k ];
-						if( !( key in node ) ) { node[ key ] = {} }
-						node = node[ key ];
-					}
-					if( REPLACE_TAG in node ) { continue }
-					for( const k in node ) { delete node[ k ] }
-					node[ REPLACE_TAG ] = _value;
-					continue;
-				}
+				const { trail, ...pInfo } = get( original, tokens );
 				for( let { length, ...keys } = trail, k = 0; k < length; k++ ) {
-					if( REPLACE_TAG in node ) { continue it_0 }
+					if( REPLACE_TAG in node ) { continue }
 					const key = keys[ k ];
 					if( !( key in node ) ) { node[ key ] = {} }
 					node = node[ key ];
 				}
 				if( REPLACE_TAG in node ) { continue }
+				if( pInfo.exists ) {
+					for( const k in node ) { delete node[ k ] }
+					node[ REPLACE_TAG ] = pInfo._value;
+					continue;
+				}
 				if( !( DELETE_TAG in node ) ) { node[ DELETE_TAG ] = [] }
 				const deletingKey = tokens[ trail.length ];
 				!node[ DELETE_TAG ].includes( deletingKey ) &&
