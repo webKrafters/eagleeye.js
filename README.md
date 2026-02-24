@@ -11,50 +11,140 @@
 	<a href="https://coveralls.io/github/webKrafters/eagleeye.js">
 		<img alt="coverage" src="https://img.shields.io/coveralls/github/webKrafters/eagleeye.js">
 	</a>
-	<img alt="NPM" src="https://img.shields.io/npm/l/@webkrafters/react-observable-context">
+	<img alt="NPM" src="https://img.shields.io/npm/l/@webkrafters/eagleeye.js">
 	<img alt="Maintenance" src="https://img.shields.io/maintenance/yes/2032">
-	<img alt="build size" src="https://img.shields.io/bundlephobia/minzip/@webkrafters/react-observable-context?label=bundle%20size">
-	<a href="https://www.npmjs.com/package/@webKrafters/react-observable-context">
-		<img alt="Downloads" src="https://img.shields.io/npm/dt/@webkrafters/react-observable-context.svg">
+	<img alt="build size" src="https://img.shields.io/bundlephobia/minzip/@webkrafters/eagleeye.js?label=bundle%20size">
+	<a href="https://www.npmjs.com/package/@webKrafters/eagleeye.js">
+		<img alt="Downloads" src="https://img.shields.io/npm/dt/@webkrafters/eagleeye.js.svg">
 	</a>
 	<img alt="GitHub package.json version" src="https://img.shields.io/github/package-json/v/webKrafters/eagleeye.js">
 </p>
 
-# React-Observable-Context [Eagle Eye]
+# Eagle Eye.
 
-<table BORDER-COLOR="0a0" BORDER-WIDTH="2">
-    <td VALIGN="middle" ALIGN="center" FONT-WEIGHT="BOLD" COLOR="#333" HEIGHT="250px" width="1250px">
-		COMPATIBLE WITH REACT VERSIONS 16.8 to 18.x.x.<br />
-		A VERSION 7.0.0 FOR REACT 19+ IS CURRENTLY UNDER DEVELOPMENT.
-	</td>
-</table>
-
-<ul>
-	<li> Auto-immutable update-friendly context. See <a href="https://eagleeye.js.org/concepts/store/setstate"><code>store.setState</code></a>.</li>
-	<li> A context bearing an observable consumer <a href="https://eagleeye.js.org/concepts/store">store</a>.</li>
-	<li> Recognizes <b>negative array indexing</b>. Please see <a href="https://eagleeye.js.org/concepts/property-path">Property Path</a> and <code>store.setState</code> <a href="https://eagleeye.js.org/concepts/store/setstate#indexing">Indexing</a>.</li>
-	<li> Only re-renders subscribing components (<a href="https://eagleeye.js.org/concepts/client">clients</a>) on context state changes.</li>
-	<li> Subscribing component decides which context state properties' changes to trigger its update.</li>
-</ul>
-
-**Name:** React-Observable-Context
-
-**Moniker:** Eagle Eye
-
-**Usage:** Please see <b><a href="https://eagleeye.js.org/getting-started">Getting Started</a></b>.
-
-**Demo:** [Play with the app on codesandbox](https://codesandbox.io/s/github/webKrafters/react-observable-context-app)\
-If sandbox fails to load app, please refresh dependencies on its lower left.
+**Name:** Eagle Eye.
 
 **Install:**\
-npm i -S react-eagleeye\
-Alternate: npm i -S @webkrafters/react-observable-context
+npm install --save @webkrafters/eagleeye
 
-May also see <b><a href="https://eagleeye.js.org/history/features">What's Changed?</a></b>
+## Usage:
+### Create (the FP way).
+```tsx
+import { createEagleEye } from '@webkrafters/eagleeye';
+const context = createEagleEye({
+	prehooks?: Prehooks<T>,
+	storage?: Storage<T>,
+	value?: T|AutoImmutable<T>
+});
+```
+### Create (the OOP way).
+```tsx
+import { EagleEyeContext } from '@webkrafters/eagleeye';
+const context = new EagleEyeContext<T>(
+	T?|AutoImmutable<T>?,
+	Prehooks<T>?,
+	Storage<T>?
+);
+```
 
-## Please see full documentation here:
+### Releasing context resources.
+```tsx
+context.dispose();
+```
+Deactivates this context by:
+<ol>
+	<li>unsubscribing all observers to it</li>
+	<li>severing connections to data stores</li>
+	<li>unsetting all resources</li>
+</ol>
+
+### Accessing external store reference.
+```tsx
+const store = context.store;
+// https://eagleeye.js.org/concepts/store/resetstate/
+store.resetState( Array<string>? );
+// https://eagleeye.js.org/concepts/store/setstate/
+store.setState( Changes<T> );
+// https://eagleeye.js.org/concepts/store/getstate/
+const state = store.getState( Array<string> );
+// https://eagleeye.js.org/concepts/store/subscribe/
+const unsubscribeFn = store.subscribe( eventType, listener );
+```
+
+### Connecting to context stream.
+A context stream allows for a client to set up automatic update to to be automatically pushed to it whenever its slice of state changes.
+```tsx
+const useStream = context.stream;
+// joining the stream twice
+// for more on selectorMap - https://eagleeye.js.org/concepts/selector-map/
+const streamer1 = useStream(SelectorMap?);
+const streamer2 = useStream(SelectorMap?);
+// check whether a streamer still defunct or still active
+if( streamer1.closed ) { ... };
+// access the current data value monitored by this streamer
+console.log( 'data', streamer1.data );
+// access the streamer current lifecycle
+console.log( 'life cycle', streamer1.phase );
+// check if the streamer is streaming
+if( streamer1.streaming ) { ... };
+// change a streamer's selector map 
+streamer1.seletorMap = SelectorMap<T>?;
+// add listener to a streamer to react to live updates to selected data.
+streamer1.addListener( 'data-changed', listener );
+// be notified of a streamer's exist from streaming.
+streamer1.addListener( 'stream-ending', listener );
+// remove listener from a streamer activities
+streamer1.removeListener( 'data-changed'|'stream-ending', listener );
+// https://eagleeye.js.org/concepts/store/resetstate/
+streamer1.resetState( Array<string>? ); // changes are context-wide
+// https://eagleeye.js.org/concepts/store/setstate/
+streamer1.setState( Changes<T> ); // changes are context-wide
+// exit streamer from streaming
+streamer1.endStream();
+```
+
+### Accessing underlying cache.
+```tsx
+const cache = context.cache;
+```
+
+### Accessing `close` status.
+```tsx
+const closed = context.closed;
+```
+
+### Accessing current state update `prehooks`.
+```tsx
+const prehooks = context.prehooks;
+```
+
+### Updating state update `prehooks`.
+```tsx
+context.prehooks = Prehooks<T>?;
+```
+
+### Accessing context `storage`.
+```tsx
+const storage = context.storage;
+```
+
+### Updating context `storage`.
+```tsx
+context.storage = storage<T>?;
+```
+
+## Notable Mentions:
+<ul>
+	<li>Facilitates sharing of underlying immutable data structure among multiple applications</li>
+	<li>Update-friendly Auto-immutable bearing context. See <a href="https://eagleeye.js.org/concepts/store/setstate"><code>store.setState</code></a>.</li>
+	<li> Recognizes <b>negative array indexing</b>. Please see <a href="https://eagleeye.js.org/concepts/property-path">Property Path</a> and <code>store.setState</code> <a href="https://eagleeye.js.org/concepts/store/setstate#indexing">Indexing</a>.</li>
+	<li> Only automatically notifying subscribing or stream (<a href="https://eagleeye.js.org/concepts/client">clients</a>) on context state changes.</li>
+	<li> Subscribers decide which exact context state properties' changes to monitor.</li>
+</ul>
+
+## Please see more documentation here:
 **[eagleeye.js.org](https://eagleeye.js.org)**
 
 # License
 
-MIT
+GPLv3
