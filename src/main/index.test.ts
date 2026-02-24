@@ -4,6 +4,7 @@ import {
 } from '@webkrafters/auto-immutable';
 
 import {
+	Phase,
 	ShutdownReason,
 	type BaseStream,
 	type IStorage,
@@ -24,7 +25,7 @@ import {
 	ACCESS_SYM,
 	createEagleEye,
 	EagleEyeContext as EagleEyeContextClass,
-	LiveStore,
+	Streamer,
 	mkReadonly,
 } from '.';
 
@@ -118,33 +119,31 @@ describe( 'EagleEyeContext', () => {
 			}) ).toBeInstanceOf( EagleEyeContextClass );
 		} );
 	} );
-	describe( 'EagleEyeContext.createStoreRef(...)', () => {
+	describe( 'EagleEyeContext.createInternalStore(...)', () => {
 		let context : EagleEyeContextClass;
 		beforeAll(() => { context = new EagleEyeContextClass() });
 		afterAll(() => { context.dispose() });
 		test( 'throws exception by default', () => {
-			expect(() => context.createStoreRef()).toThrow(
-				'May not create store reference out of context. Plese use `this.store` to obtain externally available store reference.'	
+			expect(() => context.createInternalStore()).toThrow(
+				'May not create internal stores out of context. Please use `this.store` to obtain externally available store reference.'	
 			);
 		} );
-		test( 'requires the proper access token to create dedicated store referneces', () => {
-			expect(() => context.createStoreRef( Symbol( ACCESS_SYM.description ) )).toThrow(
-				'May not create store reference out of context. Plese use `this.store` to obtain externally available store reference.'	
+		test( 'requires the proper access token to create dedicated internal store', () => {
+			expect(() => context.createInternalStore( Symbol( ACCESS_SYM.description ) )).toThrow(
+				'May not create internal stores out of context. Please use `this.store` to obtain externally available store reference.'	
 			);
-			expect(() => context.createStoreRef( Symbol( ACCESS_SYM.toString() ) )).toThrow(
-				'May not create store reference out of context. Plese use `this.store` to obtain externally available store reference.'	
+			expect(() => context.createInternalStore( Symbol( ACCESS_SYM.toString() ) )).toThrow(
+				'May not create internal stores out of context. Please use `this.store` to obtain externally available store reference.'	
 			);
-			const newStoreRef = context.createStoreRef( ACCESS_SYM );
-			expect( newStoreRef ).not.toBe( context.store );
+			const newInternalStore = context.createInternalStore( ACCESS_SYM );
+			expect( newInternalStore ).not.toBe( context.store );
 			expect( context.store ).toEqual({
-    			close: expect.any( Function ),
-    			closed: expect.any( Boolean ),
-				resetState: expect.any( Function ),
+    			resetState: expect.any( Function ),
 				setState: expect.any( Function ),
 				getState: expect.any( Function ),
 				subscribe: expect.any( Function )
 			})
-			expect( newStoreRef ).toEqual({
+			expect( newInternalStore ).toEqual({
     			close: expect.any( Function ),
     			closed: expect.any( Boolean ),
 				resetState: expect.any( Function ),
@@ -215,7 +214,6 @@ describe( 'EagleEyeContext', () => {
 				ctx.dispose();
 				expect( cache.closed ).toBe( false );
 				expect( ctx.closed ).toBe( true );
-				expect( ctx.store.closed ).toBe( true );
 
 				// lost connection to the underlying cache
 				ctx.store.setState({ c: 66 });
@@ -238,7 +236,6 @@ describe( 'EagleEyeContext', () => {
 				cache.close(); // cache closing automatically closes the context
 				expect( cache.closed ).toBe( true );
 				expect( ctx.closed ).toBe( true );
-				expect( ctx.store.closed ).toBe( true );
 
 				// lost connection to the underlying cache
 				ctx.store.setState({ c: 66 });
@@ -672,7 +669,6 @@ describe( 'EagleEyeContext', () => {
 				store.subscribe( 'closing', mockCloseListener );
 				ctx.dispose();
 				expect( mockCloseListener ).toHaveBeenCalled();
-				store.close();
 				ctx.dispose();
 			} );
 			describe( 'external store reference', () => {
@@ -1168,8 +1164,8 @@ describe( 'EagleEyeContext', () => {
 			test( 'provides change stream', () => {
 				expect( context.stream ).toEqual( expect.any( Function ) );
 			} );
-			test( "invocation returns an observable LiveStore 'an automatically updating store'", () => {
-				expect( context.stream() ).toBeInstanceOf( LiveStore );
+			test( "invocation returns an observable Streamer 'an automatically updating store'", () => {
+				expect( context.stream() ).toBeInstanceOf( Streamer );
 			} );
 			test( 'in isolation, maintains communication with the context', () => {
 				const ctx = new EagleEyeContextClass({});
@@ -1214,7 +1210,7 @@ describe( 'EagleEyeContext', () => {
 
 				ctx.dispose();
 			} );
-			describe( "change stream's LiveStore", () => {
+			describe( "change stream's Streamer", () => {
 				let selectorMapOnRender : {
 					year3: 'history.places[2].year',
 					isActive: 'isActive',
@@ -1233,7 +1229,7 @@ describe( 'EagleEyeContext', () => {
 						all: FULL_STATE_SELECTOR,
 						tags: 'tags'
 					});
-					expect( store ).toBeInstanceOf( LiveStore );
+					expect( store ).toBeInstanceOf( Streamer );
 					expect( store.data ).toEqual({
 						all: sourceData,
 						tags: sourceData.tags
@@ -1329,7 +1325,17 @@ describe( 'EagleEyeContext', () => {
 					} );
 				} );
 				describe( 'properties', () => {
-					describe( 'LiveStore.data', () => {
+					describe( 'Streamer.closed', () => {
+						test( 'is flag set when the live connection to data source is severed', () => {
+							const ctx0 = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
+							const store = ctx0.stream();
+							expect( store.closed ).toBe( false );
+							store.endStream();
+							expect( store.closed ).toBe( true );
+							ctx0.dispose();
+						} );
+					} );
+					describe( 'Streamer.data', () => {
 						test( 'carries the latest state data as referenced by the selectorMap', () => {
 							const ctx = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
 							const store = ctx.stream({
@@ -1495,7 +1501,20 @@ describe( 'EagleEyeContext', () => {
 							ctx.dispose();
 						} );
 					} );
-					describe( 'LiveStore.selectorMap', () => {
+					describe( 'Streamer.phase', () => {
+						test( "keeps track of the live store's current lifecycle", () => {
+							const ctx0 = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
+							const store = ctx0.stream();
+							store.addListener( 'stream-ending', () => {
+								expect( store.phase ).toBe( Phase.CLOSING );
+							} );
+							expect( store.phase ).toBe( Phase.OPENED );
+							store.endStream();
+							expect( store.phase ).toBe( Phase.CLOSED );
+							ctx0.dispose();
+						} );
+					} );
+					describe( 'Streamer.selectorMap', () => {
 						let selectorMapOnRerender : typeof selectorMapOnRender & { country3 : "history.places[2].country" };
 						let mockGetReturnValue : AccessorResponse<SourceData>;
 						beforeAll(() => {
@@ -1607,7 +1626,7 @@ describe( 'EagleEyeContext', () => {
 									const mockSubscribe = jest.fn()
 									const mockUnsubscribe = jest.fn();
 
-									class TestLiveStore<S extends SelectorMap> extends LiveStore<SourceData,S>{
+									class TestLiveStore<S extends SelectorMap> extends Streamer<SourceData,S>{
 										public subscribe(){
 											mockSubscribe();
 											super.subscribe();
@@ -1685,7 +1704,7 @@ describe( 'EagleEyeContext', () => {
 										// @ts-expect-error
 										.spyOn( EagleEyeContextClass.prototype, 'stream', 'get' )
 										// @ts-expect-error
-										.mockReturnValue( s => new LiveStore( ctx, s ));
+										.mockReturnValue( s => new Streamer( ctx, s ));
 
 									connectSpy.mockClear();
 									disconnectSpy.mockClear();
@@ -1725,7 +1744,7 @@ describe( 'EagleEyeContext', () => {
 										// @ts-expect-error
 										.spyOn( EagleEyeContextClass.prototype, 'stream', 'get' )
 										// @ts-expect-error
-										.mockReturnValue( s => new LiveStore( ctx, s ));
+										.mockReturnValue( s => new Streamer( ctx, s ));
 
 									getSpy.mockClear();
 
@@ -1755,7 +1774,7 @@ describe( 'EagleEyeContext', () => {
 									const mockSubscribe = jest.fn()
 									const mockUnsubscribe = jest.fn();
 
-									class TestLiveStore<S extends SelectorMap> extends LiveStore<SourceData,S>{
+									class TestLiveStore<S extends SelectorMap> extends Streamer<SourceData,S>{
 										public subscribe(){
 											mockSubscribe();
 											super.subscribe();
@@ -1821,7 +1840,7 @@ describe( 'EagleEyeContext', () => {
 										// @ts-expect-error
 										.spyOn( EagleEyeContextClass.prototype, 'stream', 'get' )
 										// @ts-expect-error
-										.mockReturnValue(() => new LiveStore( ctx ));
+										.mockReturnValue(() => new Streamer( ctx ));
 									expect( getSpy ).not.toHaveBeenCalled();
 									
 									const store = ctx.stream();
@@ -1849,7 +1868,7 @@ describe( 'EagleEyeContext', () => {
 									const mockSubscribe = jest.fn()
 									const mockUnsubscribe = jest.fn();
 
-									class TestLiveStore<S extends SelectorMap> extends LiveStore<SourceData,S>{
+									class TestLiveStore<S extends SelectorMap> extends Streamer<SourceData,S>{
 										public subscribe(){
 											mockSubscribe();
 											super.subscribe();
@@ -1887,7 +1906,7 @@ describe( 'EagleEyeContext', () => {
 										const mockSubscribe = jest.fn()
 										const mockUnsubscribe = jest.fn();
 
-										class TestLiveStore<S extends SelectorMap> extends LiveStore<SourceData,S>{
+										class TestLiveStore<S extends SelectorMap> extends Streamer<SourceData,S>{
 											public subscribe(){
 												mockSubscribe();
 												super.subscribe();
@@ -1946,8 +1965,8 @@ describe( 'EagleEyeContext', () => {
 							} );
 						} );
 					} );
-					describe( 'LiveStore.streaming', () => {
-						test( 'is flag set for a live store versus a closed store', () => {
+					describe( 'Streamer.streaming', () => {
+						test( 'is flag set for a stream-ready store', () => {
 							const ctx0 = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
 							const store = ctx0.stream();
 							expect( store.streaming ).toBe( true );
@@ -1957,7 +1976,7 @@ describe( 'EagleEyeContext', () => {
 						} );
 					} );
 				} );
-				describe( 'LiveStore.addListener', () => {
+				describe( 'Streamer.addListener', () => {
 					test( 'allows for listeners to be added for store data change and store closing events', () => {
 						const ctx = new EagleEyeContextClass( sourceData as Partial<SourceData> );
 						const store = ctx.stream({ f: 'name.first', y: 'age' });
@@ -1989,7 +2008,7 @@ describe( 'EagleEyeContext', () => {
 						ctx.dispose();
 					} )
 				} );
-				describe( 'LiveStore.endStream', () => {
+				describe( 'Streamer.endStream', () => {
 					test( 'severs connection to the global context streaming', () => {
 						const ctx = new EagleEyeContextClass( sourceData );
 						const selectorMap = { regHour: 'registered.time.hours' };
@@ -2032,7 +2051,7 @@ describe( 'EagleEyeContext', () => {
 
 					} );
 				} );			
-				describe( 'LiveStore.removeListener', () => {
+				describe( 'Streamer.removeListener', () => {
 					test( 'allows for added listeners to be removed for store data change and store closing events', () => {
 						const ctx = new EagleEyeContextClass( sourceData as Partial<SourceData> );
 						
@@ -2079,7 +2098,7 @@ describe( 'EagleEyeContext', () => {
 						ctx.dispose();
 					} )
 				} );
-				describe( 'LiveStore.resetState', () => {
+				describe( 'Streamer.resetState', () => {
 					describe( 'when selectorMap is present in the consumer', () => {
 						describe( 'and called with own property paths arguments to reset', () => {
 							test( 'resets with original slices and removes non-original slices for entries found in property paths', () => {
@@ -2213,7 +2232,7 @@ describe( 'EagleEyeContext', () => {
 						} );
 					} );
 				} );
-				describe( 'LiveStore.setState', () => {
+				describe( 'Streamer.setState', () => {
 					test( 'commits any updates to the context', () => {
 						const defaultState = createSourceData();
 						const immutable = new AutoImmutable( defaultState as Partial<SourceData> );

@@ -6,7 +6,7 @@ import type {
 
 import { FULL_STATE_SELECTOR } from './constants';
 
-import { createEagleEye, LiveStore } from './main';
+import { createEagleEye, Streamer } from './main';
 
 export type {
     BaseType,
@@ -148,6 +148,13 @@ export interface Prehooks<T extends State = State> {
 
 export type Unsubscribe = (...args: Array<unknown>) => void;
 
+export const enum Phase {
+	UN_OPENED = -1,
+	CLOSED = 0,
+	OPENED = 1,
+	CLOSING = 2
+};
+
 export const enum ShutdownReason {
 	CACHE = 'CACHE DATA SHUTDOWN',
     CONTEXT = 'CONTEXT-WIDE SHUTDOWN',
@@ -167,8 +174,6 @@ export interface Store<
 };
 
 export interface StoreRef<T extends State = State> extends IStore<T>{
-    close : () => void;
-    closed : boolean;
     getState : (propertyPaths?: Array<string>) => T;
     subscribe : {
         (eventType: "closing", listener: ShutdownMonitor) : Unsubscribe;
@@ -176,8 +181,13 @@ export interface StoreRef<T extends State = State> extends IStore<T>{
     }
 }
 
+export interface StoreInternal<T extends State = State> extends StoreRef<T>{
+    close : () => void;
+    closed : boolean;
+}
+
 export interface BaseStream<T extends State = State>{
-	<S extends SelectorMap>(selectorMap?: S) : LiveStore<T, S>;
+	<S extends SelectorMap>(selectorMap?: S) : Streamer<T, S>;
 }
 
 export interface Stream<T extends State = State> extends BaseStream<T>{
@@ -200,7 +210,7 @@ export {
 export {
     createEagleEye,
     EagleEyeContext,
-    LiveStore
+    Streamer
 } from './main';
 
 export default createEagleEye;

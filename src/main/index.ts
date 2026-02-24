@@ -7,15 +7,16 @@ import type {
 	Data,
 	IStorage,
 	Listener,
-	ProviderProps,
 	Prehooks,
+	ProviderProps,
 	RawProviderProps,
 	SelectorMap,
 	ShutdownMonitor,
 	State,
 	Store,
+	StoreInternal,
 	StoreRef,
-	Unsubscribe,
+	Unsubscribe
 } from '..';
 
 import isBoolean from 'lodash.isboolean';
@@ -24,7 +25,7 @@ import isEqual from 'lodash.isequal';
 import isPlainObject from 'lodash.isplainobject';
 import set from 'lodash.set';
 
-import get, { KeyType } from '@webkrafters/get-property';
+import get from '@webkrafters/get-property';
 import stringToDotPath from '@webkrafters/path-dotize';
 import AutoImmutable from '@webkrafters/auto-immutable';
 
@@ -32,7 +33,10 @@ import * as constants from '../constants';
 
 import Storage from '../model/storage';
 
-import { ShutdownReason } from '..';
+import {
+	Phase,
+	ShutdownReason
+} from '..';
 
 let iCount = -1;
 const createStorageKey = () => `${ ++iCount }:${ Date.now() }:${ Math.random() }`;
@@ -58,19 +62,12 @@ class Event<
 	removeListener( listener : LISTENER ) { this.listeners.delete( listener ) }
 }
 
-export const enum Phase {
-	UN_OPENED = -1,
-	CLOSED = 0,
-	OPENED = 1,
-	CLOSING = 2
-};
-
-export class LiveStore<
+export class Streamer<
 	T extends State = State,
 	S extends SelectorMap = SelectorMap
 > implements Store<T,S> {
 	private _context : EagleEyeContext<T> = null;
-	private _ctxStoreRef : StoreRef<T> = null;
+	private _internalStore : StoreInternal<T> = null;
 	private _data = {} as Data<S, T>;
 	private eventMap = {
 		'data-changed': new Event(),
@@ -83,7 +80,7 @@ export class LiveStore<
 
 	constructor( context : EagleEyeContext<T>, selectorMap? : S ) {
 		this._context = context;
-		this._setupStoreRef();
+		this._setupInternalStore();
 		if( isEmpty( selectorMap ) ) {
 			this._phase = Phase.OPENED;
 			return;
@@ -91,8 +88,12 @@ export class LiveStore<
 		this._integrateSelectors( selectorMap );
 		this._phase = Phase.OPENED;
 	}
-	
+
+	get closed() { return !this._internalStore || this._internalStore.closed }
+
 	get data() { return this._data }
+
+	get phase() { return this._phase }
 
 	get streaming() {
 		return this._phase === Phase.OPENED || this._phase === Phase.UN_OPENED
@@ -107,7 +108,7 @@ export class LiveStore<
 			|| isEqual( selectorMap, this._selectorMap )
 			|| this._phase === Phase.UN_OPENED
 		) { return }
-		this._updateStoreRef();
+		this._updateInternalStore();
 		this._integrateSelectors( selectorMap );
 	}
 
@@ -120,9 +121,9 @@ export class LiveStore<
 
 	@streamable
 	endStream() {
-		this.eventMap[ 'stream-ending' ].emit( ShutdownReason.LOCAL );
 		this._phase = Phase.CLOSING;
-		this._ctxStoreRef.close();
+		this.eventMap[ 'stream-ending' ].emit( ShutdownReason.LOCAL );
+		this._internalStore.close();
 		this._reclaim();
 	}
 
@@ -135,17 +136,17 @@ export class LiveStore<
 	
 	@streamable
 	resetState( propertyPaths = this._renderKeys ) {
-		propertyPaths.length && this._ctxStoreRef.resetState( propertyPaths );
+		propertyPaths.length && this._internalStore.resetState( propertyPaths );
 	}
 
 	@streamable
 	setState( changes : Changes<T> ) {
-		this._ctxStoreRef.setState( changes );
+		this._internalStore.setState( changes );
 	}
 
 	@streamable
 	protected subscribe() {
-		this._unsubscribe ||= this._ctxStoreRef.subscribe(
+		this._unsubscribe ||= this._internalStore.subscribe(
 			'data-updated', this._dataSourceListener
 		);
 	}
@@ -180,7 +181,7 @@ export class LiveStore<
 			return this._refreshDataRef();
 		}
 		this.subscribe();
-		const state = this._ctxStoreRef.getState( this._renderKeys );
+		const state = this._internalStore.getState( this._renderKeys );
 		const newData = {} as typeof this._data;
 		for( const k in selectorMap ) {
 			newData[ k as string ] = selectorMap[ k ] !== FULL_STATE_SELECTOR
@@ -195,7 +196,7 @@ export class LiveStore<
 		this._selectorMap && this.unsubscribe();
 		this._unsubClosing()
 		this._context = null;
-		this._ctxStoreRef = null;
+		this._internalStore = null;
 		this.eventMap = null;
 		this._unsubClosing = null;
 		this._unsubscribe = null;
@@ -207,11 +208,11 @@ export class LiveStore<
 		this.eventMap[ 'data-changed' ].emit();
 	}
 
-	private _setupStoreRef() {
-		this._ctxStoreRef = this._context.createStoreRef( ACCESS_SYM );
-		this._unsubClosing = this._ctxStoreRef.subscribe( 'closing', r => {
-			this.eventMap[ 'stream-ending' ].emit( r );
+	private _setupInternalStore() {
+		this._internalStore = this._context.createInternalStore( ACCESS_SYM );
+		this._unsubClosing = this._internalStore.subscribe( 'closing', r => {
 			this._phase = Phase.CLOSING;
+			this.eventMap[ 'stream-ending' ].emit( r );
 			this._reclaim();
 		} );
 	}
@@ -219,7 +220,7 @@ export class LiveStore<
 	private _updateData = () => {
 		let hasChanges = false;
 		const selectorEntries = Object.entries( this._selectorMap as {} );
-		const state = this._ctxStoreRef.getState( this._renderKeys );
+		const state = this._internalStore.getState( this._renderKeys );
 		for( const [ label, path ] of selectorEntries ) {
 			if( path !== FULL_STATE_SELECTOR ) {
 				const slice = get( state, path as string )._value;
@@ -242,11 +243,11 @@ export class LiveStore<
 		hasChanges && this._refreshDataRef();
 	}
 
-	private _updateStoreRef() {
+	private _updateInternalStore() {
 		this._selectorMap && this.unsubscribe();
 		this._unsubClosing();
-		this._ctxStoreRef.close();
-		this._setupStoreRef();
+		this._internalStore.close();
+		this._setupInternalStore();
 	}
 }
 
@@ -256,7 +257,8 @@ export class EagleEyeContext<T extends State = State>{
 	private _cacheCloseMonitor : () => void;
 	private _prehooks : Prehooks<T>;
 	private _storage : IStorage<T>;
-	private _store : StoreRef<T>;
+	private _store : StoreInternal<T>;
+	private _storeRef : StoreRef<T>;
 	private eventMap = {
 		closing: new Event<ShutdownMonitor, [ShutdownReason]>(),
 		'data-updated': new Event<Listener, [
@@ -269,7 +271,7 @@ export class EagleEyeContext<T extends State = State>{
 	private inchoateValue : T;
 	private storageKey : string = null;
 
-	protected _stream : BaseStream<T> = selectorMap => new LiveStore( this, selectorMap );
+	protected _stream : BaseStream<T> = selectorMap => new Streamer( this, selectorMap );
 
 	constructor(
 		value? : AutoImmutable<T>,
@@ -303,14 +305,21 @@ export class EagleEyeContext<T extends State = State>{
 		}
 		this.prehooks = prehooks;
 		this.storage = storage;
-		this._store = this._createStoreRef();
+		this._store = this._createInternalStore();
+		const ctx = this;
+		this._storeRef = {
+			getState: ( propertyPaths = [] ) => ctx._store.getState( propertyPaths ) as T,
+			resetState: ( propertyPaths = [] ) => ctx._store.resetState( propertyPaths ),
+			setState: changes => ctx._store.setState( changes ),
+			subscribe: ( eventType, listener ) => ctx._store.subscribe( eventType, listener )
+		};
 	}
 
 	get cache() { return this._cache }
 	get closed() { return !this._cache }
 	get prehooks() { return this._prehooks }
 	get storage() { return this._storage }
-	get store() { return this._store };
+	get store() { return this._storeRef };
 
 	/**
 	 * @example
@@ -364,10 +373,10 @@ export class EagleEyeContext<T extends State = State>{
 	};
 
 	@invokable
-	createStoreRef( access : Symbol = null ) {
-		if( access === ACCESS_SYM ) { return this._createStoreRef() }
-		throw new Error( 'May not create store reference out of context. Plese use `this.store` to obtain externally available store reference.' );
-	}
+	createInternalStore( access : Symbol = null ) {
+		if( access === ACCESS_SYM ) { return this._createInternalStore() }
+		throw new Error( 'May not create internal stores out of context. Please use `this.store` to obtain externally available store reference.' );
+	}					
 
 	@invokable
 	dispose() {
@@ -392,7 +401,7 @@ export class EagleEyeContext<T extends State = State>{
 	}
 
 	@invokable
-	protected disconnectStoreRef( connection : Connection<T> ) { connection.disconnect() }
+	protected disconnectInternalStore( connection : Connection<T> ) { connection.disconnect() }
 
 	@invokable
 	protected getState(
@@ -472,21 +481,19 @@ export class EagleEyeContext<T extends State = State>{
 		return () => event.removeListener( listener );
 	}
 
-	private _createStoreRef() : StoreRef<T> {
+	private _createInternalStore() : StoreInternal<T> {
 		const ctx = this;
 		let connection = ctx._cache.connect();
 		return {
 			close: () => {
-				ctx.disconnectStoreRef( connection );
+				ctx.disconnectInternalStore( connection );
 				connection = null;
 			},
 			get closed() { return !connection },
-			getState: ( propertyPaths = [] ) => ctx.getState( connection, propertyPaths ) as T,
-			resetState: ( propertyPaths = [] ) => ctx.resetState( connection, propertyPaths ),
+			getState: propertyPaths => ctx.getState( connection, propertyPaths ) as T,
+			resetState: propertyPaths => ctx.resetState( connection, propertyPaths ),
 			setState: changes => ctx.setState( connection, changes ),
-			subscribe: ( eventType, listener ) => {
-				return ctx.subscribe( eventType, listener );
-			}
+			subscribe: ( eventType, listener ) => ctx.subscribe( eventType, listener )
 		};
 	}
 
@@ -586,7 +593,7 @@ function streamable<C>( method: Function, context: C ) {
     return function<
 		T extends State = State,
 		S extends SelectorMap = SelectorMap
-	>( this: LiveStore<T, S>, ...args: Array<any> ) {
+	>( this: Streamer<T, S>, ...args: Array<any> ) {
         if( this.streaming ) { return method.apply( this, args ) }
 	}
 }
