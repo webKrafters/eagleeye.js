@@ -86,7 +86,7 @@ const useStream = context.stream;
 // for more on selectorMap - https://eagleeye.js.org/concepts/selector-map/
 const channel1 = useStream(SelectorMap?);
 const channel2 = useStream(SelectorMap?);
-// check whether a channel still defunct or still active
+// check whether a channel is still active or defunt
 if( channel1.closed ) { ... };
 // access the current data value monitored by this channel
 console.log( 'data', channel1.data );
