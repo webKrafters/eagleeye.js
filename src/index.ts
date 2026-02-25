@@ -6,7 +6,7 @@ import type {
 
 import { FULL_STATE_SELECTOR } from './constants';
 
-import { createEagleEye, Streamer } from './main';
+import { createEagleEye, Channel } from './main';
 
 export type {
     BaseType,
@@ -187,7 +187,7 @@ export interface StoreInternal<T extends State = State> extends StoreRef<T>{
 }
 
 export interface BaseStream<T extends State = State>{
-	<S extends SelectorMap>(selectorMap?: S) : Streamer<T, S>;
+	<S extends SelectorMap>(selectorMap?: S) : Channel<T, S>;
 }
 
 export interface Stream<T extends State = State> extends BaseStream<T>{
@@ -208,9 +208,9 @@ export {
 } from './constants';
 
 export {
+    Channel,
     createEagleEye,
-    EagleEyeContext,
-    Streamer
+    EagleEyeContext
 } from './main';
 
 export default createEagleEye;

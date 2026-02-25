@@ -62,7 +62,7 @@ class Event<
 	removeListener( listener : LISTENER ) { this.listeners.delete( listener ) }
 }
 
-export class Streamer<
+export class Channel<
 	T extends State = State,
 	S extends SelectorMap = SelectorMap
 > implements Store<T,S> {
@@ -271,7 +271,7 @@ export class EagleEyeContext<T extends State = State>{
 	private inchoateValue : T;
 	private storageKey : string = null;
 
-	protected _stream : BaseStream<T> = selectorMap => new Streamer( this, selectorMap );
+	protected _stream : BaseStream<T> = selectorMap => new Channel( this, selectorMap );
 
 	constructor(
 		value? : AutoImmutable<T>,
@@ -593,7 +593,7 @@ function streamable<C>( method: Function, context: C ) {
     return function<
 		T extends State = State,
 		S extends SelectorMap = SelectorMap
-	>( this: Streamer<T, S>, ...args: Array<any> ) {
+	>( this: Channel<T, S>, ...args: Array<any> ) {
         if( this.streaming ) { return method.apply( this, args ) }
 	}
 }

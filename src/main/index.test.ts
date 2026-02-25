@@ -25,7 +25,7 @@ import {
 	ACCESS_SYM,
 	createEagleEye,
 	EagleEyeContext as EagleEyeContextClass,
-	Streamer,
+	Channel,
 	mkReadonly,
 } from '.';
 
@@ -273,15 +273,15 @@ describe( 'EagleEyeContext', () => {
 						expect( ctx.store.getState() ).toEqual({});
 
 						// also applies to stream generated updates
-						const liveStore = ctx.stream();
-						liveStore.setState({ any: 'thing' });
+						const channel = ctx.stream();
+						channel.setState({ any: 'thing' });
 						connectSetSpy.mockClear();
 						expect( ctx.store.getState() ).toEqual({ any: 'thing' });
-						liveStore.resetState([ FULL_STATE_SELECTOR ]);
+						channel.resetState([ FULL_STATE_SELECTOR ]);
 						expect( connectSetSpy ).toHaveBeenCalled();
 						expect( ctx.store.getState() ).toEqual({});
 
-						liveStore.endStream();
+						channel.endStream();
 
 						ctx.dispose();
 
@@ -317,9 +317,9 @@ describe( 'EagleEyeContext', () => {
 						prehooks.resetState.mockClear();
 
 						// also applies to stream generated updates
-						const liveStore = ctx.stream();
-						liveStore.setState({ any: 'thing' });
-						liveStore.resetState([ FULL_STATE_SELECTOR ]);
+						const channel = ctx.stream();
+						channel.setState({ any: 'thing' });
+						channel.resetState([ FULL_STATE_SELECTOR ]);
 						expect( prehooks.resetState ).toHaveBeenCalledTimes( 1 );
 						expect( prehooks.resetState ).toHaveBeenCalledWith(
 							CLEAR_TAG,
@@ -329,7 +329,7 @@ describe( 'EagleEyeContext', () => {
 							}
 						);
 
-						liveStore.endStream();
+						channel.endStream();
 
 						ctx.dispose();
 
@@ -358,14 +358,14 @@ describe( 'EagleEyeContext', () => {
 						expect( ctx.store.getState() ).toEqual({});
 
 						// also applies to stream generated updates
-						const liveStore = ctx.stream();
-						liveStore.setState({ any: 'thing' });
+						const channel = ctx.stream();
+						channel.setState({ any: 'thing' });
 						connectSetSpy.mockClear();
-						liveStore.resetState([ FULL_STATE_SELECTOR ]);
+						channel.resetState([ FULL_STATE_SELECTOR ]);
 						expect( connectSetSpy ).toHaveBeenCalled();
 						expect( ctx.store.getState() ).toEqual({});
 
-						liveStore.endStream();
+						channel.endStream();
 
 						ctx.dispose();
 
@@ -396,16 +396,16 @@ describe( 'EagleEyeContext', () => {
 						});
 
 						// also applies to stream generated updates
-						const liveStore = ctx.stream();
-						liveStore.setState({ from: 'stream' });
+						const channel = ctx.stream();
+						channel.setState({ from: 'stream' });
 						connectSetSpy.mockClear();
-						liveStore.resetState([ FULL_STATE_SELECTOR ]);
+						channel.resetState([ FULL_STATE_SELECTOR ]);
 						expect( connectSetSpy ).not.toHaveBeenCalled();
 						expect( ctx.store.getState() ).toEqual({
 							any: 'thing', from: 'stream'
 						});
 
-						liveStore.endStream();
+						channel.endStream();
 
 						ctx.dispose();
 
@@ -434,13 +434,13 @@ describe( 'EagleEyeContext', () => {
 						expect( ctx.store.getState() ).toEqual({ any: 'thing' });
 
 						// also applies to stream generated updates
-						const liveStore = ctx.stream();
-						liveStore.setState({ from: 'stream' });
+						const channel = ctx.stream();
+						channel.setState({ from: 'stream' });
 						expect( ctx.store.getState() ).toEqual({
 							any: 'thing', from: 'stream'
 						});
 
-						liveStore.endStream();
+						channel.endStream();
 
 						ctx.dispose();
 
@@ -470,12 +470,12 @@ describe( 'EagleEyeContext', () => {
 						prehooks.setState.mockClear();
 
 						// also applies to stream generated updates
-						const liveStore = ctx.stream();
-						liveStore.setState({ from: 'stream' });
+						const channel = ctx.stream();
+						channel.setState({ from: 'stream' });
 						expect( prehooks.setState ).toHaveBeenCalledTimes( 1 );
 						expect( prehooks.setState ).toHaveBeenCalledWith({ from: 'stream' });
 
-						liveStore.endStream();
+						channel.endStream();
 
 						ctx.dispose();
 
@@ -502,14 +502,14 @@ describe( 'EagleEyeContext', () => {
 						expect( ctx.store.getState() ).toEqual({ any: 'thing' });
 
 						// also applies to stream generated updates
-						const liveStore = ctx.stream();
-						liveStore.setState({ from: 'stream' });
+						const channel = ctx.stream();
+						channel.setState({ from: 'stream' });
 						expect( connectSetSpy ).toHaveBeenCalled();
 						expect( ctx.store.getState() ).toEqual({
 							any: 'thing', from: 'stream'
 						});
 
-						liveStore.endStream();
+						channel.endStream();
 
 						ctx.dispose();
 
@@ -536,12 +536,12 @@ describe( 'EagleEyeContext', () => {
 						expect( ctx.store.getState() ).toEqual({});
 
 						// also applies to stream generated updates
-						const liveStore = ctx.stream();
-						liveStore.setState({ from: 'stream' });
+						const channel = ctx.stream();
+						channel.setState({ from: 'stream' });
 						expect( connectSetSpy ).not.toHaveBeenCalled();
 						expect( ctx.store.getState() ).toEqual({});
 
-						liveStore.endStream();
+						channel.endStream();
 
 						ctx.dispose();
 
@@ -573,13 +573,13 @@ describe( 'EagleEyeContext', () => {
 				expect(( prehooksMock as any ).testing ).not.toHaveBeenCalled();
 
 				// also applies to stream generated updates
-				const liveStore = ctx.stream();
-				liveStore.setState([ 'stream' ]);
+				const channel = ctx.stream();
+				channel.setState([ 'stream' ]);
 				expect(( prehooksMock as any ).testing ).not.toHaveBeenCalled();
-				liveStore.resetState([ 'stream' ]);
+				channel.resetState([ 'stream' ]);
 				expect(( prehooksMock as any ).testing ).not.toHaveBeenCalled();
 
-				liveStore.endStream();
+				channel.endStream();
 
 				ctx.dispose();
 
@@ -609,13 +609,13 @@ describe( 'EagleEyeContext', () => {
 					.toThrow( '`resetState` prehook must return a boolean value.' );
 
 				// also applies to stream generated updates
-				const liveStore = ctx.stream();
-				expect(() => liveStore.setState([ 'stream' ]))
+				const channel = ctx.stream();
+				expect(() => channel.setState([ 'stream' ]))
 					.toThrow( '`setState` prehook must return a boolean value.' );
-				expect(() => liveStore.resetState([ 'stream' ]))
+				expect(() => channel.resetState([ 'stream' ]))
 					.toThrow( '`resetState` prehook must return a boolean value.' );
 
-				liveStore.endStream();
+				channel.endStream();
 
 				ctx.dispose();
 
@@ -805,25 +805,25 @@ describe( 'EagleEyeContext', () => {
 					expect( data ).not.toEqual( currentState3 );
 					expect( currentState2 ).toBe( currentState3 );
 				} );
-				test( 'updates are propagated to all streaming components', () => {
+				test( 'updates are propagated to the store and to all streaming channels', () => {
 					const ctx = new EagleEyeContextClass( createSourceData() );
-					const liveStore1 = ctx.stream({
+					const channel1 = ctx.stream({
 						b: 'balance',
 						f: 'name.first',
 						g: 'gender'
 					});
-					const liveStore2 = ctx.stream([
+					const channel2 = ctx.stream([
 						'phone.country',
 						'phone.area',
 						'phone.local',
 						'phone.line'
 					]);
-					expect( liveStore1.data ).toEqual({
+					expect( channel1.data ).toEqual({
 						b: '$3,311.66',
 						f: 'Amber',
 						g: 'female'
 					});
-					expect( liveStore2.data ).toEqual({
+					expect( channel2.data ).toEqual({
 						0: '+1',
 						1: '947',
 						2: '552',
@@ -839,22 +839,22 @@ describe( 'EagleEyeContext', () => {
 							local: '555'
 						} as SourceData["phone"],
 					});
-					expect( liveStore1.data ).toEqual({
+					expect( channel1.data ).toEqual({
 						b: '$3,311.66',
 						f: 'Imagene',
 						g: 'female'
 					});
-					expect( liveStore2.data ).toEqual({
+					expect( channel2.data ).toEqual({
 						0: '+1',
 						1: '212',
 						2: '555',
 						3: '5000'
 					});
-					liveStore1.endStream();
-					liveStore2.endStream();
+					channel1.endStream();
+					channel2.endStream();
 					ctx.dispose();
 				} );
-				test( 'can reset state and propagate to all streaming components', () => {
+				test( 'can reset state and propagate to the store and to all streaming components', () => {
 					const cache = new AutoImmutable( sourceData );
 					const connection = cache.connect();
 					const setSpy = jest.spyOn( connection, 'set' );
@@ -862,12 +862,12 @@ describe( 'EagleEyeContext', () => {
 						.spyOn( AutoImmutable.prototype, 'connect' )
 						.mockReturnValue( connection );
 ;					const ctx = new EagleEyeContextClass( sourceData );
-					const liveStore1 = ctx.stream({
+					const channel1  = ctx.stream({
 						b: 'balance',
 						f: 'name.first',
 						g: 'gender'
 					});
-					const liveStore2 = ctx.stream([
+					const channel2  = ctx.stream([
 						'phone.country',
 						'phone.area',
 						'phone.local',
@@ -875,12 +875,12 @@ describe( 'EagleEyeContext', () => {
 						FULL_STATE_SELECTOR
 					]);
 					
-					expect( liveStore1.data ).toEqual({
+					expect( channel1 .data ).toEqual({
 						b: '$3,311.66',
 						f: 'Amber',
 						g: 'female'
 					});
-					expect( liveStore2.data ).toEqual({
+					expect( channel2 .data ).toEqual({
 						0: '+1',
 						1: '947',
 						2: '552',
@@ -902,12 +902,12 @@ describe( 'EagleEyeContext', () => {
 						newProperty: 'some test value'
 					} as AutoImmutableModule.Changes<SourceData>);
 
-					expect( liveStore1.data ).toEqual({
+					expect( channel1 .data ).toEqual({
 						b: '$3,311.66',
 						f: 'Imagene',
 						g: 'female'
 					});
-					expect( liveStore2.data ).toEqual({
+					expect( channel2 .data ).toEqual({
 						0: '+1',
 						1: '212',
 						2: '555',
@@ -932,12 +932,12 @@ describe( 'EagleEyeContext', () => {
 
 					ctx.store.resetState([ FULL_STATE_SELECTOR ]);
 
-					expect( liveStore1.data ).toEqual({
+					expect( channel1 .data ).toEqual({
 						b: '$3,311.66',
 						f: 'Amber',
 						g: 'female'
 					});
-					expect( liveStore2.data ).toEqual({
+					expect( channel2 .data ).toEqual({
 						0: '+1',
 						1: '947',
 						2: '552',
@@ -948,7 +948,7 @@ describe( 'EagleEyeContext', () => {
 					expect( ctx.store.getState([ 'newProperty' ]) )
 						.toEqual({ newProperty: undefined });
 
-					liveStore2.setState({
+					channel2 .setState({
 						friends: {
 							1: {
 								age: 44,
@@ -959,12 +959,12 @@ describe( 'EagleEyeContext', () => {
 						}
 					} as unknown as AutoImmutableModule.Changes<SourceData> );
 
-					expect( liveStore1.data ).toEqual({
+					expect( channel1 .data ).toEqual({
 						b: '$3,311.66',
 						f: 'Amber',
 						g: 'female'
 					});
-					expect( liveStore2.data ).toEqual({
+					expect( channel2 .data ).toEqual({
 						0: '+1',
 						1: '947',
 						2: '552',
@@ -1019,12 +1019,12 @@ describe( 'EagleEyeContext', () => {
 						}
 					}, expect.any( Function ));
 
-					expect( liveStore1.data ).toEqual({
+					expect( channel1 .data ).toEqual({
 						b: '$3,311.66',
 						f: 'Amber',
 						g: 'female'
 					});
-					expect( liveStore2.data ).toEqual({
+					expect( channel2 .data ).toEqual({
 						0: '+1',
 						1: '947',
 						2: '552',
@@ -1036,8 +1036,8 @@ describe( 'EagleEyeContext', () => {
 					setSpy.mockRestore();
 					connectSpy.mockRestore();
 					
-					liveStore1.endStream();
-					liveStore2.endStream();
+					channel1 .endStream();
+					channel2 .endStream();
 					ctx.dispose();
 					connection.disconnect();
 					cache.close();
@@ -1120,8 +1120,8 @@ describe( 'EagleEyeContext', () => {
 					const unsub = ctx.store.subscribe( 'data-updated', onChangeMock );
 					
 					const NEW_CNAME = 'What is my company name again?????';
-					const liveStore = ctx.stream();
-					liveStore.setState({ company: NEW_CNAME });
+					const channel = ctx.stream();
+					channel.setState({ company: NEW_CNAME });
 					expect( onChangeMock ).toHaveBeenCalledTimes( 1 );
 					expect( onChangeMock.mock.calls[ 0 ][ 0 ] ).toEqual({ company: NEW_CNAME });
 					expect( onChangeMock.mock.calls[ 0 ][ 1 ] ).toEqual([[ 'company' ]]);
@@ -1130,8 +1130,8 @@ describe( 'EagleEyeContext', () => {
 					onChangeMock.mockClear();
 					
 					const NEW_CNAME2 = 'Alright! let me tell you what\'s what!!!!!';
-					const liveStore2 = ctx.stream();
-					liveStore2.setState({ company: NEW_CNAME2 });
+					const channel2  = ctx.stream();
+					channel2 .setState({ company: NEW_CNAME2 });
 					expect( onChangeMock ).toHaveBeenCalledTimes( 1 );
 					expect( onChangeMock.mock.calls[ 0 ][ 0 ] ).toEqual({ company: NEW_CNAME2 });
 					expect( onChangeMock.mock.calls[ 0 ][ 1 ] ).toEqual([[ 'company' ]]);
@@ -1139,7 +1139,7 @@ describe( 'EagleEyeContext', () => {
 					expect( onChangeMock.mock.calls[ 0 ][ 3 ] ).toEqual( expect.any( Function ) );
 					onChangeMock.mockClear();
 					
-					liveStore.resetState([ FULL_STATE_SELECTOR ]);
+					channel.resetState([ FULL_STATE_SELECTOR ]);
 					expect( onChangeMock ).toHaveBeenCalledTimes( 1 );
 					expect( onChangeMock.mock.calls[ 0 ][ 0 ] ).toEqual({[ REPLACE_TAG ]: sourceData });
 					expect( onChangeMock.mock.calls[ 0 ][ 1 ] ).toEqual([[]]);
@@ -1148,13 +1148,13 @@ describe( 'EagleEyeContext', () => {
 					onChangeMock.mockClear();
 					
 					unsub(); // unsubscribe store change listener
-					liveStore2.setState({
+					channel2 .setState({
 						company: 'Geez! Did you get the name I sent ya?????'
 					});
 					expect( onChangeMock ).not.toHaveBeenCalled();
 
-					liveStore.endStream();
-					liveStore2.endStream();
+					channel.endStream();
+					channel2 .endStream();
 
 					ctx.dispose();
 				} );
@@ -1164,8 +1164,8 @@ describe( 'EagleEyeContext', () => {
 			test( 'provides change stream', () => {
 				expect( context.stream ).toEqual( expect.any( Function ) );
 			} );
-			test( "invocation returns an observable Streamer 'an automatically updating store'", () => {
-				expect( context.stream() ).toBeInstanceOf( Streamer );
+			test( "invocation returns an observable change stream channel 'an automatically updating store'", () => {
+				expect( context.stream() ).toBeInstanceOf( Channel );
 			} );
 			test( 'in isolation, maintains communication with the context', () => {
 				const ctx = new EagleEyeContextClass({});
@@ -1173,10 +1173,10 @@ describe( 'EagleEyeContext', () => {
 				expect( ctx.store.getState() ).toEqual({});
 				ctx.store.setState({ b: 22 });
 				const useStream = ctx.stream;
-				const liveStore_0 = useStream({
+				const channel_0  = useStream({
 					anchor: 'a'
 				});
-				const liveStore_1 = useStream({
+				const channel_1  = useStream({
 					myRes : 'b',
 					testVal: 'a'
 				});
@@ -1184,10 +1184,10 @@ describe( 'EagleEyeContext', () => {
 				expect( ctx.store.getState() ).toEqual({
 					b: 22
 				});
-				expect( liveStore_0.data ).toEqual({
+				expect( channel_0 .data ).toEqual({
 					anchor: undefined
 				});
-				expect( liveStore_1.data ).toEqual({
+				expect( channel_1 .data ).toEqual({
 					myRes : 22,
 					testVal: undefined
 				});
@@ -1197,20 +1197,20 @@ describe( 'EagleEyeContext', () => {
 					a: 1024,
 					b: 22
 				});
-				expect( liveStore_0.data ).toEqual({
+				expect( channel_0 .data ).toEqual({
 					anchor: 1024
 				});
-				expect( liveStore_1.data ).toEqual({
+				expect( channel_1 .data ).toEqual({
 					myRes : 22,
 					testVal: 1024
 				});
 				
-				liveStore_0.endStream();
-				liveStore_1.endStream();
+				channel_0 .endStream();
+				channel_1 .endStream();
 
 				ctx.dispose();
 			} );
-			describe( "change stream's Streamer", () => {
+			describe( "change stream channel", () => {
 				let selectorMapOnRender : {
 					year3: 'history.places[2].year',
 					isActive: 'isActive',
@@ -1223,63 +1223,63 @@ describe( 'EagleEyeContext', () => {
 						tag6: 'tags[5]'
 					};
 				});
-				test( 'returns a store with labeled state slices', () => {
+				test( 'returns a channel observing the labeled state slices', () => {
 					const ctx0 = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-					const store = ctx0.stream({
+					const channel = ctx0.stream({
 						all: FULL_STATE_SELECTOR,
 						tags: 'tags'
 					});
-					expect( store ).toBeInstanceOf( Streamer );
-					expect( store.data ).toEqual({
+					expect( channel ).toBeInstanceOf( Channel );
+					expect( channel.data ).toEqual({
 						all: sourceData,
 						tags: sourceData.tags
 					}),
-					expect( store.streaming ).toBe( true );
-					store.endStream();
+					expect( channel.streaming ).toBe( true );
+					channel.endStream();
 					ctx0.dispose();
 				} );
 				describe( 'events', () => {
 					describe( 'stream-ending', () => {
-						test( 'invoked at the end of live store streaming phase', () => {
+						test( "invoked at the end of channel's streaming phase", () => {
 							const ctx = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-							const store = ctx.stream();
+							const channel = ctx.stream();
 							const closeHandler = jest.fn();
-							store.addListener( 'stream-ending', closeHandler );
+							channel.addListener( 'stream-ending', closeHandler );
 							expect( closeHandler ).not.toHaveBeenCalled();
-							store.endStream();
+							channel.endStream();
 							expect( closeHandler ).toHaveBeenCalled();
 							ctx.dispose();
 						} );
 						test( 'invoked with a user level message at normal closure', () => {
 							const ctx = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-							const store = ctx.stream();
+							const channel = ctx.stream();
 							const closeHandler = jest.fn();
-							store.addListener( 'stream-ending', closeHandler );
-							store.endStream();
+							channel.addListener( 'stream-ending', closeHandler );
+							channel.endStream();
 							expect( closeHandler ).toHaveBeenCalledWith( ShutdownReason.LOCAL );
 							ctx.dispose();
 						} );
 						test( 'is invoked with a cache level message when closing due to downstream cache closure', () => {
 							const cache = new AutoImmutable( createSourceData() );
 							const ctx = new EagleEyeContextClass( cache );
-							const store = ctx.stream();
+							const channel = ctx.stream();
 							const closeHandler = jest.fn();
-							store.addListener( 'stream-ending', closeHandler );
-							expect( store.streaming ).toBe( true );
+							channel.addListener( 'stream-ending', closeHandler );
+							expect( channel.streaming ).toBe( true );
 							ctx.cache.close();
-							expect( store.streaming ).toBe( false );
+							expect( channel.streaming ).toBe( false );
 							expect( closeHandler ).toHaveBeenCalledWith( ShutdownReason.CACHE );
 							ctx.dispose();
 						} );
 						test( 'is invoked with a context level message when closing due to context disposal', () => {
 							const cache = new AutoImmutable( createSourceData() );
 							const ctx = new EagleEyeContextClass( cache );
-							const store = ctx.stream();
+							const channel = ctx.stream();
 							const closeHandler = jest.fn();
-							store.addListener( 'stream-ending', closeHandler );
-							expect( store.streaming ).toBe( true );
+							channel.addListener( 'stream-ending', closeHandler );
+							expect( channel.streaming ).toBe( true );
 							ctx.dispose();
-							expect( store.streaming ).toBe( false );
+							expect( channel.streaming ).toBe( false );
 							expect( closeHandler ).toHaveBeenCalledWith( ShutdownReason.CONTEXT );
 						} );
 					} );
@@ -1290,55 +1290,55 @@ describe( 'EagleEyeContext', () => {
 								lineDigits: 'phone.line'
 							};
 							const ctx = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-							const store = ctx.stream( selectorMap );
-							expect( store.data ).toEqual({
+							const channel = ctx.stream( selectorMap );
+							expect( channel.data ).toEqual({
 								company: 'VORTEXACO',
 								lineDigits: '2282'
 							});
 							const changeHandler = jest.fn();
-							store.addListener( 'data-changed', changeHandler );
+							channel.addListener( 'data-changed', changeHandler );
 							expect( changeHandler ).not.toHaveBeenCalled();
-							store.setState({ isActive: true }); // change to global ctx did not affect stream
-							expect( store.data ).toEqual({
+							channel.setState({ isActive: true }); // change to global ctx did not affect stream
+							expect( channel.data ).toEqual({
 								company: 'VORTEXACO',
 								lineDigits: '2282'
 							});
 							expect( changeHandler ).not.toHaveBeenCalled();
-							store.setState({ phone: { line: '2300' } }); // change to global ctx affects stream
-							expect( store.data ).toEqual({
+							channel.setState({ phone: { line: '2300' } }); // change to global ctx affects stream
+							expect( channel.data ).toEqual({
 								company: 'VORTEXACO',
 								lineDigits: '2300'
 							});
 							expect( changeHandler ).toHaveBeenCalledTimes( 1 );
 							changeHandler.mockClear();
 							// affects stream by altering its observed selector map
-							store.selectorMap = [ 'company', 'phone.line' ] as unknown as typeof selectorMap; 
-							expect( store.data ).toEqual({
+							channel.selectorMap = [ 'company', 'phone.line' ] as unknown as typeof selectorMap; 
+							expect( channel.data ).toEqual({
 								0: 'VORTEXACO',
 								1: '2300'
 							});
 							expect( changeHandler ).toHaveBeenCalledTimes( 1 );
 							changeHandler.mockClear();
-							store.endStream();
+							channel.endStream();
 							ctx.dispose();
 						} );
 					} );
 				} );
 				describe( 'properties', () => {
-					describe( 'Streamer.closed', () => {
+					describe( 'Channel.closed', () => {
 						test( 'is flag set when the live connection to data source is severed', () => {
 							const ctx0 = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-							const store = ctx0.stream();
-							expect( store.closed ).toBe( false );
-							store.endStream();
-							expect( store.closed ).toBe( true );
+							const channel = ctx0.stream();
+							expect( channel.closed ).toBe( false );
+							channel.endStream();
+							expect( channel.closed ).toBe( true );
 							ctx0.dispose();
 						} );
 					} );
-					describe( 'Streamer.data', () => {
+					describe( 'Channel.data', () => {
 						test( 'carries the latest state data as referenced by the selectorMap', () => {
 							const ctx = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-							const store = ctx.stream({
+							const channel = ctx.stream({
 								city3: 'history.places[2].city',
 								country3: 'history.places[2].country',
 								friends: 'friends',
@@ -1359,8 +1359,8 @@ describe( 'EagleEyeContext', () => {
 								tag7: defaultState.tags[ 6 ],
 								tags: defaultState.tags
 							};
-							expect( store.data ).toEqual( expectedValue );
-							store.setState({
+							expect( channel.data ).toEqual( expectedValue );
+							channel.setState({
 								friends: { [ MOVE_TAG ]: [ -1, 1 ] } as unknown as Array<any>,
 								isActive: true,
 								history: {
@@ -1373,7 +1373,7 @@ describe( 'EagleEyeContext', () => {
 								},
 								tags: { [ DELETE_TAG ]: [ 3, 5 ] } as unknown as SourceData["tags"]
 							});
-							expect( store.data ).toEqual({
+							expect( channel.data ).toEqual({
 								...expectedValue,
 								city3: 'Marakesh',
 								country3: 'Morocco',
@@ -1383,12 +1383,12 @@ describe( 'EagleEyeContext', () => {
 								tag7: undefined,
 								tags: [ 0, 1, 2, 4, 6 ].map( i => defaultState.tags[ i ] )
 							});
-							store.endStream();
+							channel.endStream();
 							ctx.dispose();
 						} );
 						test( 'holds the complete current state object whenever `@@STATE` entry appears in the selectorMap', () => {
 							const ctx = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-							const store = ctx.stream({
+							const channel = ctx.stream({
 								city3: 'history.places[2].city',
 								country3: 'history.places[2].country',
 								year3: 'history.places[2].year',
@@ -1407,8 +1407,8 @@ describe( 'EagleEyeContext', () => {
 								tag7: defaultState.tags[ 6 ],
 								state: defaultState
 							};
-							expect( store.data ).toEqual( expectedValue );
-							store.setState({
+							expect( channel.data ).toEqual( expectedValue );
+							channel.setState({
 								isActive: true,
 								history: {
 									places: {
@@ -1423,21 +1423,21 @@ describe( 'EagleEyeContext', () => {
 							updatedDataEquiv.history.places[ 2 ].city = 'Marakesh';
 							updatedDataEquiv.history.places[ 2 ].country = 'Morocco';
 							updatedDataEquiv.isActive = true;
-							expect( store.data ).toEqual({
+							expect( channel.data ).toEqual({
 								...expectedValue,
 								city3: 'Marakesh',
 								country3: 'Morocco',
 								isActive: true,
 								state: updatedDataEquiv
 							});
-							store.endStream();
+							channel.endStream();
 							ctx.dispose();
 						} );
 						test( 'holds an empty object when no renderKeys provided ', async () => {
 							const ctx = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-							const store = ctx.stream();
-							expect( store.data ).toEqual({});
-							store.setState({ // can still update state
+							const channel = ctx.stream();
+							expect( channel.data ).toEqual({});
+							channel.setState({ // can still update state
 								isActive: true,
 								history: {
 									places: {
@@ -1448,29 +1448,29 @@ describe( 'EagleEyeContext', () => {
 									} as unknown as SourceData["history"]["places"]
 								} as SourceData["history"]
 							});
-							expect( store.data ).toEqual({});
-							store.endStream();
+							expect( channel.data ).toEqual({});
+							channel.endStream();
 							ctx.dispose();
 						} );
 						test( 'does not update for resubmitted changes', async () => {
 							const ctx = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-							const store = ctx.stream({ company: 'company', fn: 'name.first' });
-							expect( store.data ).toEqual({
+							const channel = ctx.stream({ company: 'company', fn: 'name.first' });
+							expect( channel.data ).toEqual({
 								company: 'VORTEXACO',
 								fn: 'Amber'
 							});
-							store.setState({
+							channel.setState({
 								company: 'New Company',
 								name: {
 									first: 'Jack'
 								} as SourceData[ "name" ]
 							} );
-							const currStoreData = store.data;
-							expect( store.data ).toEqual({
+							const currStoreData = channel.data;
+							expect( channel.data ).toEqual({
 								company: 'New Company',
 								fn: 'Jack'
 							});
-							store.setState({
+							channel.setState({
 								company: 'New Company',
 								gender: 'Male',
 								name: {
@@ -1478,43 +1478,43 @@ describe( 'EagleEyeContext', () => {
 									last: 'Franken'
 								}
 							} );
-							expect( store.data ).toBe( currStoreData );
-							store.endStream();
+							expect( channel.data ).toBe( currStoreData );
+							channel.endStream();
 							ctx.dispose();
 						} );
 						test( 'does not respond to changes not affecting it', async () => {
 							const ctx = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-							const store = ctx.stream({ company: 'company', fn: 'name.first' });
-							expect( store.data ).toEqual({
+							const channel = ctx.stream({ company: 'company', fn: 'name.first' });
+							expect( channel.data ).toEqual({
 								company: 'VORTEXACO',
 								fn: 'Amber'
 							});
-							const currStoreData = store.data;
-							store.setState({
+							const currChannelData = channel.data;
+							channel.setState({
 								gender: 'Male',
 								name: {
 									last: 'Franken'
 								} as SourceData["name"]
 							} );
-							expect( store.data ).toBe( currStoreData );
-							store.endStream();
+							expect( channel.data ).toBe( currChannelData );
+							channel.endStream();
 							ctx.dispose();
 						} );
 					} );
-					describe( 'Streamer.phase', () => {
-						test( "keeps track of the live store's current lifecycle", () => {
+					describe( 'Channel.phase', () => {
+						test( "keeps track of the channel's current lifecycle", () => {
 							const ctx0 = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-							const store = ctx0.stream();
-							store.addListener( 'stream-ending', () => {
-								expect( store.phase ).toBe( Phase.CLOSING );
+							const channel = ctx0.stream();
+							channel.addListener( 'stream-ending', () => {
+								expect( channel.phase ).toBe( Phase.CLOSING );
 							} );
-							expect( store.phase ).toBe( Phase.OPENED );
-							store.endStream();
-							expect( store.phase ).toBe( Phase.CLOSED );
+							expect( channel.phase ).toBe( Phase.OPENED );
+							channel.endStream();
+							expect( channel.phase ).toBe( Phase.CLOSED );
 							ctx0.dispose();
 						} );
 					} );
-					describe( 'Streamer.selectorMap', () => {
+					describe( 'Channel.selectorMap', () => {
 						let selectorMapOnRerender : typeof selectorMapOnRender & { country3 : "history.places[2].country" };
 						let mockGetReturnValue : AccessorResponse<SourceData>;
 						beforeAll(() => {
@@ -1530,7 +1530,7 @@ describe( 'EagleEyeContext', () => {
 							}, {}) as typeof mockGetReturnValue;
 						});
 						describe( 'normal flow', () => {
-							test( 'adjusts the store on selctorMap change', () => {
+							test( 'adjusts the channel on selctorMap change', () => {
 								const origSelectorMap = {
 									all: FULL_STATE_SELECTOR,
 									tags: 'tags'
@@ -1541,14 +1541,14 @@ describe( 'EagleEyeContext', () => {
 									company: 'company'
 								};
 								const ctx0 = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-								const store = ctx0.stream( origSelectorMap );
-								store.selectorMap = _selectorMapOnRender as unknown as OrigSelectorMap;
-								expect( Object.keys( store.data ) )
+								const channel = ctx0.stream( origSelectorMap );
+								channel.selectorMap = _selectorMapOnRender as unknown as OrigSelectorMap;
+								expect( Object.keys( channel.data ) )
 									.toEqual( Object.keys( _selectorMapOnRender ));
-								store.selectorMap = selectorMapOnRerender as unknown as OrigSelectorMap;
-								expect( Object.keys( store.data ) )
+								channel.selectorMap = selectorMapOnRerender as unknown as OrigSelectorMap;
+								expect( Object.keys( channel.data ) )
 									.toEqual( Object.keys( selectorMapOnRerender ));
-								store.endStream();
+								channel.endStream();
 								ctx0.dispose();
 							});
 							test( 'destroys previous and obtains new connection', () => {
@@ -1567,12 +1567,12 @@ describe( 'EagleEyeContext', () => {
 								connectSpy.mockClear();
 								disconnectSpy.mockClear();
 
-								const store = ctx.stream( selectorMapOnRender );
+								const channel = ctx.stream( selectorMapOnRender );
 
 								expect( connectSpy ).toHaveBeenCalledTimes( 1 );
 								expect( disconnectSpy ).not.toHaveBeenCalled();
 
-								store.selectorMap = selectorMapOnRerender as unknown as typeof selectorMapOnRender;
+								channel.selectorMap = selectorMapOnRerender as unknown as typeof selectorMapOnRender;
 								
 								expect( connectSpy ).toHaveBeenCalledTimes( 2 );
 								expect( disconnectSpy ).toHaveBeenCalledTimes( 1 );
@@ -1581,7 +1581,7 @@ describe( 'EagleEyeContext', () => {
 								getSpy.mockRestore();
 								connectSpy.mockRestore();
 
-								store.endStream();
+								channel.endStream();
 
 								ctx.dispose();
 							});
@@ -1600,7 +1600,7 @@ describe( 'EagleEyeContext', () => {
 
 									getSpy.mockClear();
 
-									const store = ctx.stream( selectorMapOnRender );
+									const channel = ctx.stream( selectorMapOnRender );
 
 									expect( getSpy ).toHaveBeenCalledTimes( 1 );
 									expect( getSpy ).toHaveBeenCalledWith(
@@ -1608,7 +1608,7 @@ describe( 'EagleEyeContext', () => {
 									);
 									getSpy.mockClear();
 
-									store.selectorMap = selectorMapOnRerender;
+									channel.selectorMap = selectorMapOnRerender;
 
 									expect( getSpy ).toHaveBeenCalledTimes( 1 );
 									expect( getSpy ).toHaveBeenCalledWith(
@@ -1618,15 +1618,15 @@ describe( 'EagleEyeContext', () => {
 									getSpy.mockRestore();
 									connectSpy.mockRestore();
 
-									store.endStream();
+									channel.endStream();
 
 									ctx.dispose();
 								});
-								test( 'sets up new subscription with the consumer', () => {
+								test( 'sets up new subscription with the store', () => {
 									const mockSubscribe = jest.fn()
 									const mockUnsubscribe = jest.fn();
 
-									class TestLiveStore<S extends SelectorMap> extends Streamer<SourceData,S>{
+									class TestLiveStore<S extends SelectorMap> extends Channel<SourceData,S>{
 										public subscribe(){
 											mockSubscribe();
 											super.subscribe();
@@ -1642,17 +1642,17 @@ describe( 'EagleEyeContext', () => {
 
 									const ctx = new TestEagleEyeContextClass( sourceData );
 
-									const store = ctx.stream( selectorMapOnRender );
+									const channel = ctx.stream( selectorMapOnRender );
 
 									expect( mockSubscribe ).toHaveBeenCalledTimes( 1 );
 									expect( mockUnsubscribe ).not.toHaveBeenCalled();
 
-									store.selectorMap = selectorMapOnRerender;
+									channel.selectorMap = selectorMapOnRerender;
 
 									expect( mockSubscribe ).toHaveBeenCalledTimes( 2 );
 									expect( mockUnsubscribe ).toHaveBeenCalledTimes( 1 );
 
-									store.endStream();
+									channel.endStream();
 									
 									ctx.dispose();
 								});
@@ -1661,32 +1661,32 @@ describe( 'EagleEyeContext', () => {
 						describe( 'accepting an array of propertyPaths in place of a selector map', () => {
 							test( 'produces an indexed-based context state data object', () => {
 								const ctx0 = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-								const store = ctx0.stream([
+								const channel = ctx0.stream([
 									...Object.values( selectorMapOnRender ),
 									FULL_STATE_SELECTOR
 								]);
 								const stateSource = createSourceData();
-								expect( store.data ).toStrictEqual({
+								expect( channel.data ).toStrictEqual({
 									0: stateSource.history.places[ 2 ].year,
 									1: stateSource.isActive,
 									2: stateSource.tags[ 5 ],
 									3: stateSource
 								});
-								store.endStream();
+								channel.endStream();
 								ctx0.dispose();
 							} );
 						} );
 						describe( 'when the new selectorMap is empty', () => {
 							describe( 'and existing data is not empty', () => {
-								test( 'adjusts the store on selectorMap change', () => {
+								test( 'adjusts the channel on selectorMap change', () => {
 									const ctx0 = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
 						
-									const store = ctx0.stream( selectorMapOnRender );
-									expect( Object.keys( store.data ) )
+									const channel = ctx0.stream( selectorMapOnRender );
+									expect( Object.keys( channel.data ) )
 										.toEqual( Object.keys( selectorMapOnRender ));
-									store.selectorMap = {} as unknown as typeof selectorMapOnRender
-									expect( store.data ).toEqual({});
-									store.endStream();
+									channel.selectorMap = {} as unknown as typeof selectorMapOnRender;
+									expect( channel.data ).toEqual({});
+									channel.endStream();
 									ctx0.dispose();
 								} );
 								test( 'destroys previous and obtains new connection', () => {
@@ -1704,19 +1704,19 @@ describe( 'EagleEyeContext', () => {
 										// @ts-expect-error
 										.spyOn( EagleEyeContextClass.prototype, 'stream', 'get' )
 										// @ts-expect-error
-										.mockReturnValue( s => new Streamer( ctx, s ));
+										.mockReturnValue( s => new Channel( ctx, s ));
 
 									connectSpy.mockClear();
 									disconnectSpy.mockClear();
 
-									const store = ctx.stream( selectorMapOnRender );
+									const channel = ctx.stream( selectorMapOnRender );
 
 									expect( connectSpy ).toHaveBeenCalledTimes( 1 );
 									expect( disconnectSpy ).not.toHaveBeenCalled();
 
 									connectSpy.mockClear();
 
-									store.selectorMap = selectorMapOnRerender;
+									channel.selectorMap = selectorMapOnRerender;
 									
 									expect( connectSpy ).toHaveBeenCalledTimes( 1 );
 									expect( disconnectSpy ).toHaveBeenCalledTimes( 1 );
@@ -1726,7 +1726,7 @@ describe( 'EagleEyeContext', () => {
 									getSpy.mockRestore();
 									streamSpy.mockRestore();
 
-									store.endStream();
+									channel.endStream();
 
 									ctx.dispose();
 								} );
@@ -1744,11 +1744,11 @@ describe( 'EagleEyeContext', () => {
 										// @ts-expect-error
 										.spyOn( EagleEyeContextClass.prototype, 'stream', 'get' )
 										// @ts-expect-error
-										.mockReturnValue( s => new Streamer( ctx, s ));
+										.mockReturnValue( s => new Channel( ctx, s ));
 
 									getSpy.mockClear();
 
-									const store = ctx.stream( selectorMapOnRender );
+									const channel = ctx.stream( selectorMapOnRender );
 
 									expect( getSpy ).toHaveBeenCalledTimes( 1 );
 									expect( getSpy ).toHaveBeenCalledWith(
@@ -1756,25 +1756,25 @@ describe( 'EagleEyeContext', () => {
 									);
 									getSpy.mockClear();
 
-									store.selectorMap = undefined as unknown as typeof selectorMapOnRender;
+									channel.selectorMap = undefined as unknown as typeof selectorMapOnRender;
 									
 									expect( getSpy ).not.toHaveBeenCalled();
 
-									expect( store.data ).toEqual({});
+									expect( channel.data ).toEqual({});
 
 									connectSpy.mockRestore();
 									getSpy.mockRestore();
 									streamSpy.mockRestore();
 
-									store.endStream();
+									channel.endStream();
 
 									ctx.dispose();
 								} );
-								test( 'does not set up new subscription with the consumer', () => {
+								test( 'does not set up new subscription with the store', () => {
 									const mockSubscribe = jest.fn()
 									const mockUnsubscribe = jest.fn();
 
-									class TestLiveStore<S extends SelectorMap> extends Streamer<SourceData,S>{
+									class TestLiveStore<S extends SelectorMap> extends Channel<SourceData,S>{
 										public subscribe(){
 											mockSubscribe();
 											super.subscribe();
@@ -1793,40 +1793,40 @@ describe( 'EagleEyeContext', () => {
 
 									const ctx = new TestEagleEyeContextClass( sourceData );
 
-									const store = ctx.stream( selectorMapOnRender );
+									const channel = ctx.stream( selectorMapOnRender );
 
 									expect( mockSubscribe ).toHaveBeenCalledTimes( 1 );
 									expect( mockUnsubscribe ).not.toHaveBeenCalled();
 									mockSubscribe.mockClear();
 
-									store.selectorMap = undefined as unknown as typeof selectorMapOnRender;
+									channel.selectorMap = undefined as unknown as typeof selectorMapOnRender;
 
 									expect( mockSubscribe ).not.toHaveBeenCalled();
 									expect( mockUnsubscribe ).toHaveBeenCalledTimes( 1 );
 
-									store.endStream();
+									channel.endStream();
 
 									ctx.dispose();
 								} );
 							} );
 							describe( 'and existing data is empty', () => {
-								test( 'leaves the store as-is on selctorMap change', () => {
+								test( 'leaves the channel as-is on selctorMap change', () => {
 									const ctx0 = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-									const store = ctx0.stream();
-									const _origData = store.data as typeof mockGetReturnValue;
+									const channel = ctx0.stream();
+									const _origData = channel.data as typeof mockGetReturnValue;
 									expect( _origData ).toEqual({});
-									store.selectorMap = undefined;
-									expect( store.data ).toBe( _origData );
-									store.selectorMap = null as unknown as undefined;
-									expect( store.data ).toBe( _origData );
-									store.selectorMap = {};
-									expect( store.data ).toBe( _origData );
-									store.selectorMap = [];
-									expect( store.data ).toBe( _origData );
-									store.endStream();
+									channel.selectorMap = undefined;
+									expect( channel.data ).toBe( _origData );
+									channel.selectorMap = null as unknown as undefined;
+									expect( channel.data ).toBe( _origData );
+									channel.selectorMap = {};
+									expect( channel.data ).toBe( _origData );
+									channel.selectorMap = [];
+									expect( channel.data ).toBe( _origData );
+									channel.endStream();
 									ctx0.dispose();
 								} );
-								test( 'performs no state data update', async () => {
+								test( 'performs no channel data update', async () => {
 									const cache = new AutoImmutable( sourceData );
 									const connection = cache.connect();
 									const getSpy = jest
@@ -1840,35 +1840,35 @@ describe( 'EagleEyeContext', () => {
 										// @ts-expect-error
 										.spyOn( EagleEyeContextClass.prototype, 'stream', 'get' )
 										// @ts-expect-error
-										.mockReturnValue(() => new Streamer( ctx ));
+										.mockReturnValue(() => new Channel( ctx ));
 									expect( getSpy ).not.toHaveBeenCalled();
 									
-									const store = ctx.stream();
+									const channel = ctx.stream();
 
 									expect( getSpy ).not.toHaveBeenCalled();
-									expect( store.data ).toEqual({});
+									expect( channel.data ).toEqual({});
 									getSpy.mockClear();
 
-									const existingData = store.data;
+									const existingData = channel.data;
 
-									store.selectorMap = undefined;
+									channel.selectorMap = undefined;
 
 									expect( getSpy ).not.toHaveBeenCalled();
-									expect( store.data ).toEqual( existingData );
+									expect( channel.data ).toEqual( existingData );
 
 									connectSpy.mockRestore();
 									getSpy.mockRestore();
 									streamSpy.mockRestore();
 
-									store.endStream();
+									channel.endStream();
 
 									ctx.dispose();
 								} );
-								test( 'does not set up new subscription with the consumer', () => {
+								test( 'does not set up new subscription with the store', () => {
 									const mockSubscribe = jest.fn()
 									const mockUnsubscribe = jest.fn();
 
-									class TestLiveStore<S extends SelectorMap> extends Streamer<SourceData,S>{
+									class TestLiveStore<S extends SelectorMap> extends Channel<SourceData,S>{
 										public subscribe(){
 											mockSubscribe();
 											super.subscribe();
@@ -1887,26 +1887,26 @@ describe( 'EagleEyeContext', () => {
 
 									const ctx = new TestEagleEyeContextClass( sourceData );
 
-									const store = ctx.stream();
+									const channel = ctx.stream();
 
 									expect( mockSubscribe ).not.toHaveBeenCalled();
 									expect( mockUnsubscribe ).not.toHaveBeenCalled();
 
-									store.selectorMap = {};
+									channel.selectorMap = {};
 
 									expect( mockSubscribe ).not.toHaveBeenCalled();
 									expect( mockUnsubscribe ).not.toHaveBeenCalled();
 
-									store.endStream();
+									channel.endStream();
 
 									ctx.dispose();
 								} );
 								describe( 'and previous property path is empty', () => {
-									test( 'skips refreshing connection: no previous connections to the consumer existed', () => {
+									test( 'skips refreshing connection: no previous connections to the store existed', () => {
 										const mockSubscribe = jest.fn()
 										const mockUnsubscribe = jest.fn();
 
-										class TestLiveStore<S extends SelectorMap> extends Streamer<SourceData,S>{
+										class TestLiveStore<S extends SelectorMap> extends Channel<SourceData,S>{
 											public subscribe(){
 												mockSubscribe();
 												super.subscribe();
@@ -1937,7 +1937,7 @@ describe( 'EagleEyeContext', () => {
 
 										connectSpy.mockClear();
 
-										const store = ctx.stream();
+										const channel = ctx.stream();
 										
 										expect( connectSpy ).toHaveBeenCalledTimes( 1 );
 										expect( mockSubscribe ).not.toHaveBeenCalled();
@@ -1946,7 +1946,7 @@ describe( 'EagleEyeContext', () => {
 
 										connectSpy.mockClear();
 
-										store.selectorMap = {} as unknown as typeof selectorMapOnRender;
+										channel.selectorMap = {} as unknown as typeof selectorMapOnRender;
 
 										expect( connectSpy ).not.toHaveBeenCalled();
 										expect( mockSubscribe ).not.toHaveBeenCalled();
@@ -1957,7 +1957,7 @@ describe( 'EagleEyeContext', () => {
 										disconnectSpy.mockRestore();
 										getSpy.mockRestore();
 
-										store.endStream();
+										channel.endStream();
 
 										ctx.dispose();
 									} );
@@ -1965,59 +1965,59 @@ describe( 'EagleEyeContext', () => {
 							} );
 						} );
 					} );
-					describe( 'Streamer.streaming', () => {
-						test( 'is flag set for a stream-ready store', () => {
+					describe( 'Channel.streaming', () => {
+						test( 'is flag set for a stream-ready channel', () => {
 							const ctx0 = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-							const store = ctx0.stream();
-							expect( store.streaming ).toBe( true );
-							store.endStream();
-							expect( store.streaming ).toBe( false );
+							const channel = ctx0.stream();
+							expect( channel.streaming ).toBe( true );
+							channel.endStream();
+							expect( channel.streaming ).toBe( false );
 							ctx0.dispose();
 						} );
 					} );
 				} );
-				describe( 'Streamer.addListener', () => {
-					test( 'allows for listeners to be added for store data change and store closing events', () => {
+				describe( 'Channel.addListener', () => {
+					test( 'allows for listeners to be added for channel data change and channel closing events', () => {
 						const ctx = new EagleEyeContextClass( sourceData as Partial<SourceData> );
-						const store = ctx.stream({ f: 'name.first', y: 'age' });
+						const channel = ctx.stream({ f: 'name.first', y: 'age' });
 						const mockChangeListener = jest.fn();
 						const mockCloseListener = jest.fn();
-						store.addListener( 'data-changed', mockChangeListener );
-						store.addListener( 'stream-ending', mockCloseListener );
-						store.setState({ age: 55 });
+						channel.addListener( 'data-changed', mockChangeListener );
+						channel.addListener( 'stream-ending', mockCloseListener );
+						channel.setState({ age: 55 });
 						expect( mockChangeListener ).toHaveBeenCalled();
 						expect( mockCloseListener ).not.toHaveBeenCalled();
 						mockChangeListener.mockClear();
-						store.setState({ name: { first: 'Janet' } });
+						channel.setState({ name: { first: 'Janet' } });
 						expect( mockChangeListener ).toHaveBeenCalled();
 						expect( mockCloseListener ).not.toHaveBeenCalled();
 						mockChangeListener.mockClear();
-						store.endStream();
+						channel.endStream();
 						expect( mockChangeListener ).not.toHaveBeenCalled();
 						expect( mockCloseListener ).toHaveBeenCalled();
 						ctx.dispose();
 					} );
-					test( 'attempt to add listeners for unknown events is not allowed', () => {
+					test( 'attempt to add listeners for unknown events is disallowed', () => {
 						const ctx = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
-						const store = ctx.stream();
+						const channel = ctx.stream();
 						expect(() => {
 							// @ts-expect-error
-							store.addListener( 'someEvent', () => {} );
+							channel.addListener( 'someEvent', () => {} );
 						} ).toThrow();
-						store.endStream();
+						channel.endStream();
 						ctx.dispose();
 					} )
 				} );
-				describe( 'Streamer.endStream', () => {
-					test( 'severs connection to the global context streaming', () => {
+				describe( 'Channel.endStream', () => {
+					test( 'severs connection to the global context stream', () => {
 						const ctx = new EagleEyeContextClass( sourceData );
 						const selectorMap = { regHour: 'registered.time.hours' };
 						const dataChangeHandler = jest.fn();
-						const store = ctx.stream( selectorMap );
-						store.addListener( 'data-changed', dataChangeHandler );
-						expect( store.data ).toEqual({ regHour: 9 });
+						const channel = ctx.stream( selectorMap );
+						channel.addListener( 'data-changed', dataChangeHandler );
+						expect( channel.data ).toEqual({ regHour: 9 });
 						
-						store.setState({
+						channel.setState({
 							registered: {
 								month: 7,
 								time: {
@@ -2029,12 +2029,12 @@ describe( 'EagleEyeContext', () => {
 						});
 						expect( dataChangeHandler ).toHaveBeenCalled();
 						
-						expect( store.data ).toEqual({ regHour: 22 });
+						expect( channel.data ).toEqual({ regHour: 22 });
 						dataChangeHandler.mockClear();
 
 						// after diposal, the store has no access to the context 
 						ctx.dispose();
-						store.setState({
+						channel.setState({
 							registered: {
 								month: 3,
 								time: {
@@ -2043,62 +2043,62 @@ describe( 'EagleEyeContext', () => {
 							} as SourceData["registered"]
 						});
 						expect( dataChangeHandler ).not.toHaveBeenCalled();
-						expect( store.data ).toEqual({ regHour: 22 }); // instead of 16
+						expect( channel.data ).toEqual({ regHour: 22 }); // instead of 16
 
-						store.endStream();
+						channel.endStream();
 
 						ctx.dispose();
 
 					} );
 				} );			
-				describe( 'Streamer.removeListener', () => {
-					test( 'allows for added listeners to be removed for store data change and store closing events', () => {
+				describe( 'Channel.removeListener', () => {
+					test( 'allows for added listeners to be removed for channel data change and channel closing events', () => {
 						const ctx = new EagleEyeContextClass( sourceData as Partial<SourceData> );
 						
-						const store = ctx.stream({ a: 'age', f: 'name.first' });
+						const channel = ctx.stream({ a: 'age', f: 'name.first' });
 						
 						const mockChangeListener = jest.fn();
 						const mockCloseListener = jest.fn();
 
-						store.addListener( 'stream-ending', mockCloseListener );
-						store.addListener( 'data-changed', mockChangeListener );
+						channel.addListener( 'stream-ending', mockCloseListener );
+						channel.addListener( 'data-changed', mockChangeListener );
 
-						store.setState({ age: 55 });
+						channel.setState({ age: 55 });
 						expect( mockChangeListener ).toHaveBeenCalled();
 						expect( mockCloseListener ).not.toHaveBeenCalled();
 
 						mockChangeListener.mockClear();
 
-						store.removeListener( 'stream-ending', mockCloseListener );
-						store.removeListener( 'data-changed', mockChangeListener );
+						channel.removeListener( 'stream-ending', mockCloseListener );
+						channel.removeListener( 'data-changed', mockChangeListener );
 
-						store.setState({ name: { first: 'Janet' } });
+						channel.setState({ name: { first: 'Janet' } });
 						expect( mockChangeListener ).not.toHaveBeenCalled();
 						expect( mockCloseListener ).not.toHaveBeenCalled();
 						
-						store.endStream();
+						channel.endStream();
 						
 						expect( mockChangeListener ).not.toHaveBeenCalled();
 						expect( mockCloseListener ).not.toHaveBeenCalled();
 						
 						ctx.dispose();
 					} );
-					test( 'attempt to remove listeners for unknown events is not allowed', () => {
+					test( 'attempt to remove listeners for unknown events is disallowed', () => {
 						const ctx = new EagleEyeContextClass( createSourceData() as Partial<SourceData> );
 						
-						const store = ctx.stream();
+						const channel = ctx.stream();
 
 						expect(() => {
 							// @ts-expect-error
-							store.removeListener( 'someEvent', () => {} );
+							channel.removeListener( 'someEvent', () => {} );
 						} ).toThrow();
 
-						store.endStream();
+						channel.endStream();
 						
 						ctx.dispose();
 					} )
 				} );
-				describe( 'Streamer.resetState', () => {
+				describe( 'Channel.resetState', () => {
 					describe( 'when selectorMap is present in the consumer', () => {
 						describe( 'and called with own property paths arguments to reset', () => {
 							test( 'resets with original slices and removes non-original slices for entries found in property paths', () => {
@@ -2110,9 +2110,9 @@ describe( 'EagleEyeContext', () => {
 									.spyOn( AutoImmutable.prototype, 'connect' )
 									.mockReturnValue( connection );
 								const ctx = new EagleEyeContextClass( sourceData );
-								const store = ctx.stream( selectorMapOnRender );
+								const channel = ctx.stream( selectorMapOnRender );
 								setSpy.mockClear();
-								store.resetState([ 'blatant', 'company', 'xylophone', 'yodellers[5]', 'to.the.zenith' ]);
+								channel.resetState([ 'blatant', 'company', 'xylophone', 'yodellers[5]', 'to.the.zenith' ]);
 								expect( setSpy ).toHaveBeenCalledTimes( 1 );
 								expect( setSpy.mock.calls[ 0 ][ 0 ] ).toEqual({
 									[ DELETE_TAG ]: [ 'blatant', 'xylophone', 'yodellers', 'to' ],
@@ -2122,7 +2122,7 @@ describe( 'EagleEyeContext', () => {
 								connectSpy.mockRestore();
 								setSpy.mockRestore();
 
-								store.endStream();
+								channel.endStream();
 
 								ctx.dispose();
 
@@ -2139,9 +2139,9 @@ describe( 'EagleEyeContext', () => {
 									.spyOn( AutoImmutable.prototype, 'connect' )
 									.mockReturnValue( connection );
 								const ctx = new EagleEyeContextClass( sourceData );
-								const store = ctx.stream( selectorMapOnRender );
+								const channel = ctx.stream( selectorMapOnRender );
 								setSpy.mockClear();
-								store.resetState();
+								channel.resetState();
 								expect( setSpy ).toHaveBeenCalledTimes( 1 );
 								expect( setSpy.mock.calls[ 0 ][ 0 ] ).toEqual({
 									history: {
@@ -2165,7 +2165,7 @@ describe( 'EagleEyeContext', () => {
 								connectSpy.mockRestore();
 								setSpy.mockRestore();
 
-								store.endStream();
+								channel.endStream();
 
 								ctx.dispose();
 
@@ -2184,9 +2184,9 @@ describe( 'EagleEyeContext', () => {
 									.spyOn( AutoImmutable.prototype, 'connect' )
 									.mockReturnValue( connection );
 								const ctx = new EagleEyeContextClass( sourceData );
-								const store = ctx.stream();
+								const channel = ctx.stream();
 								setSpy.mockClear();
-								store.resetState([ 'blatant', 'company', 'xylophone', 'yodellers', 'zenith' ]);
+								channel.resetState([ 'blatant', 'company', 'xylophone', 'yodellers', 'zenith' ]);
 								expect( setSpy ).toHaveBeenCalledTimes( 1 );
 								expect( setSpy.mock.calls[ 0 ][ 0 ] ).toEqual({
 									[ DELETE_TAG ]: [ 'blatant','xylophone','yodellers','zenith' ],
@@ -2197,7 +2197,7 @@ describe( 'EagleEyeContext', () => {
 								connectSpy.mockRestore();
 								setSpy.mockRestore();
 
-								store.endStream();
+								channel.endStream();
 
 								ctx.dispose();
 
@@ -2213,17 +2213,17 @@ describe( 'EagleEyeContext', () => {
 									AutoImmutable.prototype, 'connect'
 								).mockReturnValue( connection );
 								const ctx = new EagleEyeContextClass( sourceData );
-								const store = ctx.stream();
+								const channel = ctx.stream();
 								setSpy.mockClear();
 
-								store.resetState();
+								channel.resetState();
 
 								expect( setSpy ).not.toHaveBeenCalled();
 
 								connectSpy.mockRestore();
 								setSpy.mockRestore();
 
-								store.endStream();
+								channel.endStream();
 
 								ctx.dispose();
 
@@ -2232,16 +2232,16 @@ describe( 'EagleEyeContext', () => {
 						} );
 					} );
 				} );
-				describe( 'Streamer.setState', () => {
+				describe( 'Channel.setState', () => {
 					test( 'commits any updates to the context', () => {
 						const defaultState = createSourceData();
 						const immutable = new AutoImmutable( defaultState as Partial<SourceData> );
 						const ctx = new EagleEyeContextClass( immutable );
 
-						const store = ctx.stream();
-						expect( store.data ).toEqual({}); // no selectormap under observation
+						const channel = ctx.stream();
+						expect( channel.data ).toEqual({}); // no selectormap under observation
 						expect( ctx.store.getState() ).toEqual( defaultState );
-						store.setState({
+						channel.setState({
 							friends: { [ MOVE_TAG ]: [ -1, 1 ] } as unknown as Array<any>,
 							isActive: true,
 							history: {
@@ -2262,9 +2262,9 @@ describe( 'EagleEyeContext', () => {
 						expectedValue.tags = [ 0, 1, 2, 4, 6 ].map( i => defaultState.tags![ i ] );
 
 						expect( ctx.store.getState() ).toEqual( expectedValue );
-						expect( store.data ).toEqual({}); // no selectormap under observation
+						expect( channel.data ).toEqual({}); // no selectormap under observation
 						
-						store.endStream();
+						channel.endStream();
 
 						ctx.dispose();
 					} );

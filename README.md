@@ -78,36 +78,36 @@ const state = store.getState( Array<string> );
 const unsubscribeFn = store.subscribe( eventType, listener );
 ```
 
-### Connecting to context stream.
-A context stream allows a client to set up a channel through which it receives automatc updates whenever its selected slices of state change.
+### Joining the context stream.
+A context stream allows a client to set up a dedicated channel through which it receives automatic updates whenever its selected slices of state change. It can also update the context through this channel.
 ```tsx
 const useStream = context.stream;
 // joining the stream twice
 // for more on selectorMap - https://eagleeye.js.org/concepts/selector-map/
-const streamer1 = useStream(SelectorMap?);
-const streamer2 = useStream(SelectorMap?);
-// check whether a streamer still defunct or still active
-if( streamer1.closed ) { ... };
-// access the current data value monitored by this streamer
-console.log( 'data', streamer1.data );
-// access the streamer current lifecycle
-console.log( 'life cycle', streamer1.phase );
-// check if the streamer is streaming
-if( streamer1.streaming ) { ... };
-// change a streamer's selector map 
-streamer1.seletorMap = SelectorMap<T>?;
-// add listener to a streamer to react to live updates to selected data.
-streamer1.addListener( 'data-changed', listener );
-// be notified of a streamer's exist from streaming.
-streamer1.addListener( 'stream-ending', listener );
-// remove listener from a streamer activities
-streamer1.removeListener( 'data-changed'|'stream-ending', listener );
+const channel1 = useStream(SelectorMap?);
+const channel2 = useStream(SelectorMap?);
+// check whether a channel still defunct or still active
+if( channel1.closed ) { ... };
+// access the current data value monitored by this channel
+console.log( 'data', channel1.data );
+// access the channel current lifecycle
+console.log( 'life cycle', channel1.phase );
+// check if the channel is streaming
+if( channel1.streaming ) { ... };
+// change a channel's selector map 
+channel1.seletorMap = SelectorMap<T>?;
+// add listener to a channel to react to live updates to selected data.
+channel1.addListener( 'data-changed', listener );
+// be notified of a channel's exit from stream.
+channel1.addListener( 'stream-ending', listener );
+// remove listener from a channel activities
+channel1.removeListener( 'data-changed'|'stream-ending', listener );
 // https://eagleeye.js.org/concepts/store/resetstate/
-streamer1.resetState( Array<string>? ); // changes are context-wide
+channel1.resetState( Array<string>? ); // changes are context-wide
 // https://eagleeye.js.org/concepts/store/setstate/
-streamer1.setState( Changes<T> ); // changes are context-wide
-// exit streamer from streaming
-streamer1.endStream();
+channel1.setState( Changes<T> ); // changes are context-wide
+// exit channel from stream
+channel1.endStream();
 ```
 
 ### Accessing underlying cache.
