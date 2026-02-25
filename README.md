@@ -22,6 +22,8 @@
 
 # Eagle Eye.
 
+Framework-agnostic native-javasacript change-stream capable immutable state manager. It is not logically bound to any section of an application. A single instance can be deployed  anywhere on the application as needed. It is also not bound by quantity. As many instances as are needed can be created and deployed simultaneously within an application. 
+
 **Name:** Eagle Eye.
 
 **Install:**\
