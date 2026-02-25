@@ -79,7 +79,7 @@ const unsubscribeFn = store.subscribe( eventType, listener );
 ```
 
 ### Connecting to context stream.
-A context stream allows for a client to set up automatic update to to be automatically pushed to it whenever its slice of state changes.
+A context stream allows a client to set up a channel through which it receives automatc updates whenever its selected slices of state change.
 ```tsx
 const useStream = context.stream;
 // joining the stream twice
