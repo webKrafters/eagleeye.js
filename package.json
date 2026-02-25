@@ -1,13 +1,13 @@
 {
   "alias": "Eagle eye context",
-  "author": "Stephen Isienyi <stephen.isienyi@webkrafting.com>",
+  "author": "Stephen Isienyi <stephen.isienyi@webkrafters.tech>",
   "bugs": {
     "url": "https://github.com/webKrafters/eagleeye.js/issues"
   },
   "contributors": [
     "steveswork <stephen.isienyi@gmail.com> (https://github.com/steveswork)"
   ],
-  "description": "Context stream - Observable and Update-friendly immutable data.",
+  "description": "Context stream - Provides an Observable and Update-friendly immutable application level state.",
   "devDependencies": {
     "@babel/cli": "^7.17.0",
     "@babel/core": "^7.20.5",
@@ -97,7 +97,7 @@
     "test:watch": "eslint --fix && jest --updateSnapshot --watchAll"
   },
   "types": "dist/index.d.ts",
-  "version": "1.0.0-beta.0",
+  "version": "1.0.0-beta.1",
   "dependencies": {
     "@webkrafters/auto-immutable": "^2.0.5"
   }
