@@ -11,6 +11,7 @@ import { createEagleEye, Channel } from './main';
 export type {
     BaseType,
     ClearCommand,
+    Immutable as AutoImmutable,
     KeyType,
     MoveCommand,
     PushCommand,
