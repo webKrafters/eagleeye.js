@@ -22,12 +22,17 @@
 
 # Eagle Eye.
 
-Framework-agnostic native-javasacript change-stream capable immutable state manager. It is not logically bound to any section of an application. A single instance can be deployed  anywhere on the application as needed. It is also not bound by quantity. As many instances as are needed can be created and deployed simultaneously within an application. 
+<p>Framework-agnostic native-javasacript change-stream capable immutable state manager.</p>
+<p>It is not logically bound to any section of an application. A single instance may be deployed anywhere within an application as needed.</p>
+<p>It is also not bound by quantity. As many instances as needed may be created and deployed simultaneously anywhere within an application.</p>
 
-**Name:** Eagle Eye.
-
-**Install:**\
+<br />
+<p><b>Name:</b> Eagle Eye.</p>
+<p>
+<b>Install:</b>
 npm install --save @webkrafters/eagleeye
+</p>
+<br />
 
 ## Usage:
 ### Create (the FP way).
