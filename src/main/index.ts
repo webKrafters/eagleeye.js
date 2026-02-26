@@ -306,12 +306,11 @@ export class EagleEyeContext<T extends State = State>{
 		this.prehooks = prehooks;
 		this.storage = storage;
 		this._store = this._createInternalStore();
-		const ctx = this;
 		this._storeRef = {
-			getState: ( propertyPaths = [] ) => ctx._store.getState( propertyPaths ) as T,
-			resetState: ( propertyPaths = [] ) => ctx._store.resetState( propertyPaths ),
-			setState: changes => ctx._store.setState( changes ),
-			subscribe: ( eventType, listener ) => ctx._store.subscribe( eventType, listener )
+			getState: this._store.getState,
+			resetState: this._store.resetState,
+			setState: this._store.setState,
+			subscribe: this._store.subscribe
 		};
 	}
 
@@ -481,7 +480,7 @@ export class EagleEyeContext<T extends State = State>{
 		return () => event.removeListener( listener );
 	}
 
-	private _createInternalStore() : StoreInternal<T> {
+	private _createInternalStore() {
 		const ctx = this;
 		let connection = ctx._cache.connect();
 		return {
@@ -490,11 +489,11 @@ export class EagleEyeContext<T extends State = State>{
 				connection = null;
 			},
 			get closed() { return !connection },
-			getState: propertyPaths => ctx.getState( connection, propertyPaths ) as T,
-			resetState: propertyPaths => ctx.resetState( connection, propertyPaths ),
+			getState: ( propertyPaths = [] ) => ctx.getState( connection, propertyPaths ) as T,
+			resetState: ( propertyPaths = [] ) => ctx.resetState( connection, propertyPaths ),
 			setState: changes => ctx.setState( connection, changes ),
-			subscribe: ( eventType, listener ) => ctx.subscribe( eventType, listener )
-		};
+			subscribe: ctx.subscribe.bind( ctx )
+		} as StoreInternal<T>;
 	}
 
 	private _reclaim() {
