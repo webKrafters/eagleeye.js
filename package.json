@@ -1,5 +1,5 @@
 {
-  "alias": "Eagle eye context",
+  "alias": "Eagle Eye JS",
   "author": "Stephen Isienyi <stephen.isienyi@webkrafters.tech>",
   "bugs": {
     "url": "https://github.com/webKrafters/eagleeye.js/issues"
@@ -69,7 +69,7 @@
     "state management",
     "state manager"
   ],
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "main": "dist/index.js",
   "name": "@webkrafters/eagleeye",
   "peerDependencies": {
@@ -97,7 +97,7 @@
     "test:watch": "eslint --fix && jest --updateSnapshot --watchAll"
   },
   "types": "dist/index.d.ts",
-  "version": "1.0.0-beta.4",
+  "version": "1.0.0",
   "dependencies": {
     "@webkrafters/auto-immutable": "^2.0.5"
   }
