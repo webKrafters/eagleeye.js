@@ -33,7 +33,7 @@
 
 ## Usage:
 
-Please consult the [Getting Started](https://eagleeye.js.org/gettiing-started) page to quick information regarding usage.
+Please consult the [Getting Started](https://eagleeye.js.org/getting-started) page for quick information regarding usage.
 
 There are also framework specific Eagle-Eye installations such as the [React Observable Context](https://www.npmjs.com/package/@webkrafters/react-observable-context).
 
