@@ -23,7 +23,6 @@ import isBoolean from 'lodash.isboolean';
 import isEmpty from 'lodash.isempty';
 import isEqual from 'lodash.isequal';
 import isPlainObject from 'lodash.isplainobject';
-import set from 'lodash.set';
 
 import get from '@webkrafters/get-property';
 import stringToDotPath from '@webkrafters/path-dotize';
@@ -595,4 +594,31 @@ function streamable<C>( method: Function, context: C ) {
 	>( this: Channel<T, S>, ...args: Array<any> ) {
         if( this.streaming ) { return method.apply( this, args ) }
 	}
+}
+
+
+const OPEN_PTN = /^[[.]+/;
+const CLOSE_PTN = /[.\]]+$/;
+const SEP_PTN = /\]*[[\].]+/;
+const NUMERIC_PTN = /^[0-9]+$/;
+
+/** Cannot use this function to mutate obj */
+function set<T>( obj : {}, path : Array<string|number>, value : T ) : void;
+function set<T>( obj : {}, path : string, value : T ) : void;
+function set<T>( obj, path, value : T ) : void {
+	if( !Array.isArray( path ) ) {
+		path = path
+			.replace( OPEN_PTN, '' )
+			.replace( CLOSE_PTN, '' )
+			.split( SEP_PTN );
+	}
+	const pLen = path.length - 1;
+	for( let p = 0; p < pLen; p++ ) {
+		const key = path[ p ];
+		if( !( key in obj ) ) {
+			obj[ key ] = NUMERIC_PTN.test( key ) ? [] : {};
+		}
+		obj = obj[ key ];
+	}
+	obj[ path[ pLen ] ] = value;
 }

@@ -46,7 +46,6 @@
     "lodash.isobject": "^3.0.2",
     "lodash.isplainobject": "^4.0.6",
     "lodash.omit": "^4.5.0",
-    "lodash.set": "^4.3.2",
     "setimmediate": "^1.0.5",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
@@ -79,8 +78,7 @@
     "lodash.isempty": ">= 0.1.0",
     "lodash.isequal": ">= 0.1.0",
     "lodash.isplainobject": ">= 0.8.0",
-    "lodash.omit": ">= 0.1.0",
-    "lodash.set": ">= 0.1.0"
+    "lodash.omit": ">= 0.1.0"
   },
   "publishConfig": {
     "access": "public"
@@ -97,7 +95,7 @@
     "test:watch": "eslint --fix && jest --updateSnapshot --watchAll"
   },
   "types": "dist/index.d.ts",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "dependencies": {
     "@webkrafters/auto-immutable": "^2.0.5"
   }
