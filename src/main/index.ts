@@ -596,16 +596,15 @@ function streamable<C>( method: Function, context: C ) {
 	}
 }
 
-
 const OPEN_PTN = /^[[.]+/;
 const CLOSE_PTN = /[.\]]+$/;
 const SEP_PTN = /\]*[[\].]+/;
 const NUMERIC_PTN = /^[0-9]+$/;
 
 /** Cannot use this function to mutate obj */
-function set<T>( obj : {}, path : Array<string|number>, value : T ) : void;
-function set<T>( obj : {}, path : string, value : T ) : void;
-function set<T>( obj, path, value : T ) : void {
+export function set<T>( obj : {}, path : Array<string|number>, value : T ) : void;
+export function set<T>( obj : {}, path : string, value : T ) : void;
+export function set<T>( obj, path, value : T ) : void {
 	if( !Array.isArray( path ) ) {
 		path = path
 			.replace( OPEN_PTN, '' )
@@ -615,9 +614,16 @@ function set<T>( obj, path, value : T ) : void {
 	const pLen = path.length - 1;
 	for( let p = 0; p < pLen; p++ ) {
 		const key = path[ p ];
-		if( !( key in obj ) ) {
-			obj[ key ] = NUMERIC_PTN.test( key ) ? [] : {};
-		}
+		const isArrayChildKey = NUMERIC_PTN.test( path[ p + 1 ] );
+    	if( !obj[ key ] || typeof obj[ key ] !== 'object' ) {
+			obj[ key ] = isArrayChildKey ? [] : {};
+		} else if( !isArrayChildKey && Array.isArray( obj[ key ] ) ) {
+			const arr = obj[ key ];
+			obj[ key ] = {};
+			for( let aLen = arr.length, a = 0; a < aLen; a++ ) {
+				obj[ key ][ a ] = arr[ a ];
+			}
+    	}
 		obj = obj[ key ];
 	}
 	obj[ path[ pLen ] ] = value;

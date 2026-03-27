@@ -27,6 +27,7 @@ import {
 	EagleEyeContext as EagleEyeContextClass,
 	Channel,
 	mkReadonly,
+	set
 } from '.';
 
 import { isReadonly } from '../test-artifacts/utils';
@@ -2299,6 +2300,94 @@ describe( 'EagleEyeContext', () => {
 			} );
 			test( 'also returns the object reference', () => {
 				expect( isReadonly( mkReadonly( getTestData() )) ).toBe( true );
+			} );
+		} );
+		// @debug
+		describe( '1wwww', () => {
+		// describe( 'set(...)', () => {
+			test( 'adding numeric key to object', () => {
+				const test = { a: { b: { c: 33 } } };
+				set( test, 'a.b.4', 22 );
+				expect( test ).toEqual({
+					a: { b: { 4: 22, c: 33 } }
+				});
+			} );
+			test( 'adding string key to object', () => {
+				const test = { a: { b: { c: 33 } } };
+				set( test, 'a.b.a', 22 );
+				expect( test ).toEqual({
+					a: { b: { a: 22, c: 33 } }
+				});
+			} );
+			test( 'uses array to represent numeric key by default', () => {
+				let test = { a: { b: { c: 33 } } };
+				set( test, 'a.b.k.p[2].j', 22 );
+				expect( test ).toEqual({
+					a: { b: {
+						c: 33,
+						k: { p: [, , { j: 22 } ] }
+					} }
+				});
+				test = { a: { b: { c: 33 } } };
+				set( test, 'a.b.k.p.2.j', 22 );
+				expect( test ).toEqual({
+					a: { b: {
+						c: 33,
+						k: { p: [, , { j: 22 } ] }
+					} }
+				});
+			} );
+			test( 'convert array to object upon encountering non-numeric child key', () => {
+				const test = {
+					a: { b: {
+						c: 33,
+						k: { p: [, , { j: 22 } ] }
+					} }
+				};
+				set( test, 'a.b.k.p.q', 96 );
+				expect( test ).toEqual({
+					a: { b: {
+						c: 33,
+						k: { p: {
+							2: { j: 22 },
+							q: 96
+						} }
+					} }
+				});
+			} );
+			test( 'overwrites non-compliant existing value types', () => {
+				let test = { a: { b: { c: 33 } } };
+				set( test, 'a.b.c.m', 22 );
+				expect( test ).toEqual({
+					a: { b: { c: { m: 22 } } }
+				});
+				test = { a: { b: { c: 33 } } };
+				set( test, 'a', 22 );
+				expect( test ).toEqual({ a: 22 });
+
+				const testb = { a: { b: null } };
+				set( testb, 'a.b.0', 22 );
+				expect( testb ).toEqual({ a: { b: [ 22 ] } });
+				set( testb, [ 'a', 'b', 2 ], 108 );
+				expect( testb ).toEqual({ a: { b: [ 22, , 108 ] } });
+				set( testb, [ 'a', 'b', 'c' ], [ 1, 2, 3 ] );
+				expect( testb ).toEqual({ a: { b: {
+					0: 22,
+					2: 108,
+					c: [ 1, 2, 3 ]
+				} } });
+				// @ts-expect-error
+				set( testb, [ 'a', 'b', 'c', 'd' ], testb.a.b.c );
+				expect( testb ).toEqual({ a: { b: {
+					0: 22,
+					2: 108,
+					c: {
+						0: 1,
+						1: 2,
+						2: 3,
+						d: [ 1, 2, 3 ]
+					}
+				} } });
 			} );
 		} );
 	} );
