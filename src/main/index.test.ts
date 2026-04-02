@@ -2302,9 +2302,7 @@ describe( 'EagleEyeContext', () => {
 				expect( isReadonly( mkReadonly( getTestData() )) ).toBe( true );
 			} );
 		} );
-		// @debug
-		describe( '1wwww', () => {
-		// describe( 'set(...)', () => {
+		describe( 'set(...)', () => {
 			test( 'adding numeric key to object', () => {
 				const test = { a: { b: { c: 33 } } };
 				set( test, 'a.b.4', 22 );

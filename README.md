@@ -24,7 +24,8 @@
 
 <p>Framework-agnostic native-javasacript change-stream capable immutable state manager.</p>
 <p>It is not logically bound to any section of an application. A single instance may be deployed anywhere within an application as needed.</p>
-<p>It is also not bound by quantity. As many instances as needed may be created and deployed simultaneously anywhere within an application.</p>
+<p>It is not bound by quantity. As many instances as needed may be created and deployed simultaneously anywhere within an application.</p>
+<p>It supports framework-agnostic state sharing among applications. Simply create an <a href="https://auto-immutable.js.org/intro/">Auto Immutable</a> instance to pass around as the <code>value</code> argument for this or any <a href="https://eagleeye.js.org">Eagle Eye</a> based state manager instances.</p>
 
 <br />
 <p><b>Name:</b> Eagle Eye.</p>
@@ -35,7 +36,11 @@
 
 Please consult the [Getting Started](https://eagleeye.js.org/getting-started) page for quick information regarding usage.
 
-There are also framework specific Eagle-Eye installations such as the [React Observable Context](https://www.npmjs.com/package/@webkrafters/react-observable-context).
+There are also framework specific Eagle-Eye installations such as:
+<br />
+[React Eagle Eye](https://www.npmjs.com/package/@webkrafters/react-eagle)
+<br />
+[React Observable Context](https://www.npmjs.com/package/@webkrafters/react-observable-context)
 
 
 ## Please see more documentation here:
