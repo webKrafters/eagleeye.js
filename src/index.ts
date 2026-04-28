@@ -57,56 +57,57 @@ export type ObjectSelector = Record<Text, Text | FullStateSelector>;
 
 export type ArraySelector = Array<Text | FullStateSelector>;
 
-export type SelectorMap = ObjectSelector | ArraySelector | void;
+export type SelectorMap = ObjectSelector | ArraySelector | undefined | null;
 
-type ReplacePathSeps<
-    P extends Text,
-    T extends string,
-> = P extends `${infer U}${T}${infer V}`
-    ? ReplacePathSeps<`${U}.${V}`, T>
-    : P;
+// =====
 
-type TrimPathSep<P extends Text> = P extends `${infer U}]${never}` ? U : P;
+type Replace<
+  P extends string,
+  S extends string,
+  R extends string
+> = P extends `${infer K}${S}${infer PP}`
+  ? `${K}${R}${Replace<PP, S, R>}`
+  : P;
 
-type NormalizePath<P extends Text> = TrimPathSep<
-    ReplacePathSeps<
-        ReplacePathSeps<
-            ReplacePathSeps<
-                P,
-                ']['
-            >,
-            '].'
-        >,
-        '['
-    >
->;
+type DotizedPath<
+  P extends string
+> = Replace<Replace<Replace<Replace<P, ']', '.'>, '[', '.'>, '..', '.'>, '...', '.'>;
 
-type Datum<
-    P extends Text,
-    S extends Record<Text, any> = State
-> = P extends `${infer K}.${infer P_1}`
-    ? Datum<P_1, S[K]>
-    : P extends ''
-    ? S
-    : any;
+type DrillType<
+  T extends Record<any, any>,
+  P extends string,
+  W extends State
+> = P extends `${infer K}.${infer R}`
+    ? T[K] extends {}
+        ? DrillType<T[K], R, W>
+        : any
+    : P extends FullStateSelector
+    ? W
+    : T[P];
 
-type DataPoint<
-    P extends Text,
-    S extends State
-> = P extends FullStateSelector ? S : Datum<NormalizePath<P>, S>;
+type ExtricateTypeFrom<
+  T extends State,
+  P extends string
+> = DrillType<T, DotizedPath<P>, T>;
 
 export type Data<
-    SELECTOR_MAP extends SelectorMap,
-    STATE extends State = State
-> = (
-    SELECTOR_MAP extends void
+  S extends SelectorMap = SelectorMap,
+  T extends State = State
+> = S extends undefined|null
     ? {}
-    : SELECTOR_MAP extends ObjectSelector
-    ? {[ S_KEY in keyof SELECTOR_MAP ] : DataPoint<SELECTOR_MAP[S_KEY], STATE> }
-    : SELECTOR_MAP extends ArraySelector
-    ? {[ S_NUM : number ] : DataPoint<SELECTOR_MAP[number], STATE>}
-    : Array<any>
-);
+    : S extends ObjectSelector
+        ? {
+            [K in keyof S]: S[K] extends string
+            ? ExtricateTypeFrom<T, S[K]>
+            : S[K] extends keyof T
+            ? T[S[K]]
+            : any
+        }
+        : S extends Array<infer U>
+            ? U extends FullStateSelector
+                ? Record<number, T>
+                : Record<number, any>
+            : Record<any, any>;
 
 export type Changes<T extends State = State> = BaseChanges<T>;
 
@@ -171,7 +172,7 @@ export interface Store<
     T extends State = State,
     SELECTOR_MAP extends SelectorMap = SelectorMap
 > extends IStore<T> {
-    data : Data<SELECTOR_MAP>;
+    data : Data<SELECTOR_MAP, T>;
 };
 
 export interface StoreRef<T extends State = State> extends IStore<T>{
@@ -188,11 +189,11 @@ export interface StoreInternal<T extends State = State> extends StoreRef<T>{
 }
 
 export interface BaseStream<T extends State = State>{
-	<S extends SelectorMap>(selectorMap?: S) : Channel<T, S>;
-}
+	<const S extends SelectorMap>(selectorMap? : S) : Channel<T, S>;
+};
 
 export interface Stream<T extends State = State> extends BaseStream<T>{
-	<S extends SelectorMap>(selectorMap?: S) : Store<T, S>;
+	<const S extends SelectorMap>(selectorMap?: S) : Store<T, S>;
 }
 
 export {
