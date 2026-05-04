@@ -38,7 +38,9 @@ Please consult the [Getting Started](https://eagleeye.js.org/getting-started) pa
 
 There are also framework specific Eagle-Eye installations such as:
 <br />
-[React Eagle Eye](https://www.npmjs.com/package/@webkrafters/react-eagle)
+[Angular Eagle Eye](https://www.npmjs.com/package/@webkrafters/ng-eagleeye)
+<br />
+[React Eagle Eye](https://www.npmjs.com/package/@webkrafters/react-eagleeye)
 <br />
 [React Observable Context](https://www.npmjs.com/package/@webkrafters/react-observable-context)
 
