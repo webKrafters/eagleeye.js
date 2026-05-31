@@ -706,7 +706,7 @@ describe( 'EagleEyeContext', () => {
 						expect( currentState ).not.toBe( data );
 						expect( currentState ).toStrictEqual( data );
 					} );
-					test( 'returns only copy of the state targeted by property paths', () => {
+					test( 'returns only copy of the state targeted by property paths', () => {					
 						expect( ctx.store.getState([
 							'customer.name.last',
 							'type',
@@ -767,7 +767,7 @@ describe( 'EagleEyeContext', () => {
 							expect( isReadonly( ctx.store.getState() ) ).toBe( true );
 						} );
 						test( 'returning readonly state for when using property paths', () => {
-							expect( isReadonly( ctx.store.getState([
+						expect( isReadonly( ctx.store.getState([
 								'customer.name.last',
 								'type',
 								'customer.phone'
