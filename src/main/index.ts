@@ -150,10 +150,9 @@ export class Channel<
 		);
 	}
 
-	@streamable
 	protected unsubscribe() {
 		// istanbul ignore next
-		if( !this._unsubscribe ) { return }
+		if( !this._unsubscribe || this._phase === Phase.CLOSED ) { return }
 		this._unsubscribe();
 		this._unsubscribe = null;
 	}
