@@ -152,7 +152,7 @@ export class Channel<
 
 	protected unsubscribe() {
 		// istanbul ignore next
-		if( !this._unsubscribe || this._phase === Phase.CLOSED ) { return }
+		if( this.closed ) { return }
 		this._unsubscribe();
 		this._unsubscribe = null;
 	}
