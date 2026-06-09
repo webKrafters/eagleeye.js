@@ -43,6 +43,8 @@ There are also framework specific Eagle-Eye installations such as:
 [React Eagle Eye](https://www.npmjs.com/package/@webkrafters/react-eagleeye)
 <br />
 [React Observable Context](https://www.npmjs.com/package/@webkrafters/react-observable-context)
+<br />
+[Vue Eagle Eye](https://www.npmjs.com/package/@webkrafters/vue-eagleeye)
 
 
 ## Please see more documentation here:
