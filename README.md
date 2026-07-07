@@ -45,6 +45,8 @@ There are also framework specific Eagle-Eye installations such as:
 [React Observable Context](https://www.npmjs.com/package/@webkrafters/react-observable-context)
 <br />
 [Vue Eagle Eye](https://www.npmjs.com/package/@webkrafters/vue-eagleeye)
+<br />
+[Svelte Eagle Eye](https://www.npmjs.com/package/@webkrafters/svelte-eagleeye)
 
 
 ## Please see more documentation here:
