@@ -95,13 +95,14 @@
   },
   "scripts": {
     "build": "eslint --fix && rm -rf dist && tsc && babel dist -d dist",
+    "pack": "npm run build && npm pack",
     "test": "eslint --fix && jest --coverage --updateSnapshot",
     "test:clean": "jest --clearCache",
     "test:core": "jest --updateSnapshot",
     "test:watch": "eslint --fix && jest --updateSnapshot --watchAll"
   },
   "types": "dist/index.d.ts",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "dependencies": {
     "@webkrafters/auto-immutable": "^2.0.5"
   }

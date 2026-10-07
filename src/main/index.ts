@@ -53,10 +53,7 @@ class Event<
 	LISTENER_PARAMS extends Array<unknown> = Array<unknown>
 > {	
 	private listeners = new Set<LISTENER>();
-
-	emit( ...args : LISTENER_PARAMS ) {
-		this.listeners.forEach( listener => listener( ...args ) );
-	}
+	emit( ...args : LISTENER_PARAMS ) { this.listeners.forEach( listener => listener( ...args ) ) }
 	addListener( listener : LISTENER ) { this.listeners.add( listener ) }
 	removeListener( listener : LISTENER ) { this.listeners.delete( listener ) }
 }
@@ -122,6 +119,7 @@ export class Channel<
 	endStream() {
 		this._phase = Phase.CLOSING;
 		this.eventMap[ 'stream-ending' ].emit( ShutdownReason.LOCAL );
+		this.unsubscribe();
 		this._internalStore.close();
 		this._reclaim();
 	}
